@@ -8,7 +8,7 @@ import os, sys, time
 import time as t
 from uuid import uuid4
 from telethon.errors import FloodWaitError
-from telethon.errors import SessionPasswordNeededError, PhoneNumberInvalidError
+from telethon.errors import SessionPasswordNeededError, PhoneNumberInvalidError, PhoneNumberBannedError
 from telethon import TelegramClient, sync, events
 from telethon.tl.functions.messages import GetHistoryRequest, GetBotCallbackAnswerRequest
 from bs4 import BeautifulSoup as bs
@@ -94,15 +94,15 @@ def clear():
 def menu():
   global var
   clear()
-  print(f"{o}[{V}1{o}] Auto Tasks Bot")
-  print(f"{o}[{V}2{o}] Get Account")
-  print(f"{o}[{V}3{o}] Get Cookies")
-  print(f"{o}[{V}4{o}] Deconnection T/G")
-  print(f"{o}[{V}5{o}] List/Delete Instagram Account")
-  print(f"{o}[{V}6{o}] Update Bot")
-  print(f"{o}[{V}0{o}] Exit")
+  print(f"{o}[{V}1{o}] Démarrer les tâches automatiques")
+  print(f"{o}[{V}2{o}] Obtenir un compte Instagram")
+  print(f"{o}[{V}3{o}] Obtenir les cookies d'un compte")
+  print(f"{o}[{V}4{o}] Déconnexion Telegram")
+  print(f"{o}[{V}5{o}] Gérer les comptes Instagram")
+  print(f"{o}[{V}6{o}] Mettre à jour le Bot")
+  print(f"{o}[{V}0{o}] Quitter")
   print(f"{o}═════════════════════════════════════════")
-  sel=input(f"{o}[{V}?{o}] Choice: {B}")
+  sel=input(f"{o}[{V}?{o}] Votre choix : {B}")
   if sel=="1":
     var.append("1")
     number()
@@ -115,7 +115,7 @@ def menu():
     os.system("rm -r sessions")
     os.system("rm number.txt")
     clear()
-    print(f"{r}Deconnected{S}")
+    print(f"{r}Déconnexion réussie{S}")
     time.sleep(4)
     menu()
   elif sel=="5":
@@ -131,7 +131,7 @@ def number():
   try:
     phone=open("number.txt","r").read()
   except:
-    phone=input(f"{o}[{V}?{o}] Number T/G: {vi}")
+    phone=input(f"{o}[{V}?{o}] Numéro de téléphone T/G : {vi}")
     open("number.txt","w").write(phone)
   telegram(phone, return_data=False)
 def telegram(phone, return_data):
@@ -182,22 +182,44 @@ def telegram(phone, return_data):
                 with open("number.txt", "r") as f:
                     number = f.read().strip()
             else:
-                number = "Unknown"
+                number = "Inconnu"
 
-            print(f"[!] Your Number: {number}")
-            code = input("[?] Input Code Text: ")
+            print(f"[*] Votre numéro : {number}")
+            code = input("[?] Entrez le code reçu : ")
 
             client.sign_in(phone=phone, code=code)
             clear()
 
+        except PhoneNumberBannedError:
+            clear()
+            print(f"{r}[!] Le numéro de téléphone {phone} a été banni par Telegram.{S}")
+            print(f"{J}[-] Veuillez utiliser un autre numéro.{S}")
+            try:
+                os.remove("number.txt")
+            except OSError:
+                pass
+            time.sleep(4)
+            menu()
+            return # Important to exit the function here
+        except PhoneNumberInvalidError:
+            clear()
+            print(f"{r}[!] Le numéro de téléphone {phone} est invalide.{S}")
+            print(f"{J}[-] Veuillez vérifier le numéro et réessayer.{S}")
+            try:
+                os.remove("number.txt")
+            except OSError:
+                pass
+            time.sleep(4)
+            menu()
+            return # Important to exit the function here
         except SessionPasswordNeededError:
-            pw2fa = input("[?] Input Password 2FA: ")
+            pw2fa = input("[?] Entrez le mot de passe (2FA) : ")
             client.sign_in(phone=phone, password=pw2fa)
 
     
     if not return_data:
         me = client.get_me()
-        print(f"[√] Your Account: {me.first_name} {me.last_name}")
+        print(f"[√] Compte : {me.first_name} {me.last_name}")
         print("═════════════════════════════════════════")
 
         
@@ -237,16 +259,16 @@ def manage():
     acc=x.strip()
     if "💎" in acc:
       user=re.search("💎 (.*?) /",str(acc)).group(1)
-      print(f"{vi}{o}Username: {vi}{user}")
-      pwd=input(f"{o}Password: {vi}")
+      print(f"{vi}{o}Nom d'utilisateur : {vi}{user}")
+      pwd=input(f"{o}Mot de passe : {vi}")
       s_acc=open(os.path.join(BASE_DIR, "Compte.txt"),'a')
       s_acc.write(f"{user}|{pwd}\n")
       s_acc.close()
       continue
     elif "✅" in acc:
       cuser=acc.split("✅ ")[1].split(" (")[0]
-      print(f"{vi}{o}Username: {vi}{cuser}")
-      pwd=input(f"{o}Password: {vi}")
+      print(f"{vi}{o}Nom d'utilisateur : {vi}{cuser}")
+      pwd=input(f"{o}Mot de passe : {vi}")
       s_acc=open(os.path.join(BASE_DIR, "Compte.txt"),'a')
       s_acc.write(f"{cuser}|{pwd}\n")
       s_acc.close()
@@ -358,7 +380,7 @@ def account():
           sys.stdout.write(f"\r{B}[{V}√{B}] {user}\r")
           sys.stdout.flush()
         else:
-          print(f"{B}[{R}X{B}] {user}{S} {black}(Verify this account)")
+          print(f"{B}[{R}X{B}] {user}{S} {black}(Vérifiez ce compte)")
           continue
         channel_entity = client.get_entity("@SmmKingdomTasksBot")
         channel_username = "@SmmKingdomTasksBot"
@@ -377,7 +399,7 @@ def account():
           else:
             break
         client.send_message(entity=channel_entity, message=f"{user}")
-        print(f"{o}[{B}•{o}] Username: {v}{user}{S}")
+        print(f"{o}[{B}•{o}] Nom d'utilisateur : {v}{user}{S}")
         mss=message()
         if "Sorry" in mss:
           continue
@@ -395,7 +417,7 @@ def account():
           continue
     else:
       os.system("clear")
-      u=(f"{r}No File /sdcard/SmmKingdomTask/insta-acct.txt Detected\n{S}")
+      u=(f"{r}Aucun fichier trouvé : SmmKingdomTask/insta-acct.txt\n{S}")
       for ix in u:
         print(ix,end='',flush=True)
         time.sleep(0.1)
@@ -410,56 +432,56 @@ def task(cooks,user):
     if "▪️ Action :" in mss:
       if "the post" in mss:
         link=re.search('▪️ Link :\n(.*?)\n▪️ Action :',str(mss)).group(1)
-        print(f"{vi}PostLink: {B}{link}")
+        print(f"{vi}Lien du post : {B}{link}")
         like=likes(link,cooks)
         if "ok" in like:
-          print(f"{vi}[{V}√{vi}] {V}Like Succes{S}")
+          print(f"{vi}[{V}√{vi}] {V}Like réussi{S}")
           client.send_message(entity=channel_entity, message="✅Completed")
           task(cooks,user)
         else:
-          print(f"{vi}[{R}x{vi}] {R}Like No Succes{S}")
+          print(f"{vi}[{R}x{vi}] {R}Échec du Like{S}")
           client.send_message(entity=channel_entity, message="✅Completed")
           task(cooks,user)
       elif "Follow" in mss:
         link=re.search('▪️ Link :\n(.*?)\n▪️ Action :',str(mss)).group(1)
-        print(f"{vi}UserLink: {B}{link}")
+        print(f"{vi}Lien utilisateur : {B}{link}")
         follow=followers(link,cooks)
         if "ok" in follow:
-          print(f"{vi}[{V}√{vi}] {V}Followers Succes{S}")
+          print(f"{vi}[{V}√{vi}] {V}Follow réussi{S}")
           client.send_message(entity=channel_entity, message="✅Completed")
           task(cooks,user)
         else:
-          print(f"{vi}[{R}x{vi}] {R}Followers No Succes{S}")
+          print(f"{vi}[{R}x{vi}] {R}Échec du Follow{S}")
           client.send_message(entity=channel_entity, message="✅Completed")
           task(cooks,user)
       elif "the comment" in mss:
         link=re.search('▪️ Link :\n(.*?)\n▪️ Action :',str(mss)).group(1)
-        print(f"{vi}CommentLink: {B}{link}")
+        print(f"{vi}Lien du commentaire : {B}{link}")
         time.sleep(2)
         mss=coms(user)
         print(f"{J}{mss}")
         comms=comment(link,cooks,mss)
         if "ok" in comms:
-          print(f"{vi}[{V}+{vi}] {V}Comment Succes{S}")
+          print(f"{vi}[{V}+{vi}] {V}Commentaire réussi{S}")
           client.send_message(entity=channel_entity, message="✅Completed")
           task(cooks,user)
         else:
-          print(f"{vi}[{R}x{vi}] {R}Comment No Succes{S}")
+          print(f"{vi}[{R}x{vi}] {R}Échec du commentaire{S}")
           client.send_message(entity=channel_entity, message="✅Completed")
           task(cooks,user)
       elif "Stories" in mss:
         link=re.search('▪️ Link :\n(.*?)\n▪️ Action :',str(mss)).group(1)
-        print(f"{vi}StoriesLink: {B}{link}")
+        print(f"{vi}Lien des stories : {B}{link}")
         story(link,cooks)
         time.sleep(2)
-        print(f"{vi}[{V}√{vi}] {V}Stories view Succes{S}")
+        print(f"{vi}[{V}√{vi}] {V}Vue des stories réussie{S}")
         client.send_message(entity=channel_entity, message="✅Completed")
         task(cooks,user)
       elif "Open the video" in mss:
         link=re.search('▪️ Link :\n(.*?)\n▪️ Action :',str(mss)).group(1)
-        print(f"{vi}TvLink: {B}{link}")
+        print(f"{vi}Lien de la TV : {B}{link}")
         Tv(link,cooks)
-        print(f"{vi}[{V}√{vi}] {V}TV view Succes{S}")
+        print(f"{vi}[{V}√{vi}] {V}Vue de la TV réussie{S}")
         client.send_message(entity=channel_entity, message="✅Completed")
         task(cooks,user)
     elif "Sorry" in mss:
@@ -500,15 +522,15 @@ def task(cooks,user):
       else:
         cmt=coms1()
         link=re.search('▪️ Link :\n(.*?)\n▪️ Action :',str(cmt)).group(1)
-        print(f"{vi}CommentLink: {B}{link}")
+        print(f"{vi}Lien du commentaire : {B}{link}")
         print(f"{J}{mss}")
         comms=comment(link,cooks,mss)
         if "ok" in comms:
-          print(f"{vi}[{V}√{vi}] {V}Comment Succes{S}")
+          print(f"{vi}[{V}√{vi}] {V}Commentaire réussi{S}")
           client.send_message(entity=channel_entity, message="✅Completed")
           task(cooks,user)
         else:
-          print(f"{vi}[{R}x{vi}] {R}Comment No Succes{S}")
+          print(f"{vi}[{R}x{vi}] {R}Échec du commentaire{S}")
           client.send_message(entity=channel_entity, message="✅Completed")
           task(cooks,user)
   except:
@@ -536,9 +558,9 @@ def comment(link, cooks, mss):
         rq1=rq.get(link,headers=header0,cookies={'cookie':cooks})
         rp1=bs(rq1.text,'html.parser')
         uid=re.search('"media_id":"(.*?)"',str(rp1)).group(1)
-        print(f"{o}CommentID: {vi}{uid}{S}")
+        print(f"{o}ID du commentaire : {vi}{uid}{S}")
     except requests.exceptions.ConnectionError:
-        sys.stdout.write(f"\r{r}Pas de Connection{S}\r")
+        sys.stdout.write(f"\r{r}Pas de connexion{S}\r")
         sys.stdout.flush()
         comment(link,cooks,mss)
     except:
@@ -561,7 +583,7 @@ def comment(link, cooks, mss):
         rq2=rq.post(url,headers=header,data=data).text
         return rq2
     except requests.exceptions.ConnectionError:
-        sys.stdout.write(f"\r{r}Pas de Connection{S}\r")
+        sys.stdout.write(f"\r{r}Pas de connexion{S}\r")
         sys.stdout.flush()
         comment(link,cooks,mss)
     except:
@@ -581,7 +603,7 @@ def likes1(uid,cooks):
   try:
     rq2=requests.post(f"https://i.instagram.com/api/v1/media/{uid}/like/", headers=headers).text
   except requests.exceptions.ConnectionError:
-    sys.stdout.write(f"\r{r}Pas de Connection{S}\r")
+    sys.stdout.write(f"\r{r}Pas de connexion{S}\r")
     sys.stdout.flush()
     likes1(uid,cooks)
   except:
@@ -610,9 +632,9 @@ def likes(link, cooks):
         rq1=rq.get(link,headers=header0,cookies={'cookie':cooks})
         rp1=bs(rq1.text,'html.parser')
         uid=re.search('"media_id":"(.*?)"',str(rp1)).group(1)
-        print(f"{o}PostID: {vi}{uid}{S}")
+        print(f"{o}ID du post : {vi}{uid}{S}")
     except requests.exceptions.ConnectionError:
-        sys.stdout.write(f"\r{r}Pas de Connection{S}\r")
+        sys.stdout.write(f"\r{r}Pas de connexion{S}\r")
         sys.stdout.flush()
         likes(link,cooks)
     except:
@@ -632,7 +654,7 @@ def likes(link, cooks):
     try:
         rq2=requests.post(f"https://i.instagram.com/api/v1/media/{uid}/like/", headers=headers).text
     except requests.exceptions.ConnectionError:
-        sys.stdout.write(f"\r{r}Pas de Connection{S}\r")
+        sys.stdout.write(f"\r{r}Pas de connexion{S}\r")
         sys.stdout.flush()
         likes(link,cooks)
     except:
@@ -661,9 +683,9 @@ def followers(link, cooks):
         rq1=rq.get(link,headers=header0,cookies={'cookie':cooks})
         rp1=bs(rq1.text,'html.parser')
         uid=re.search('"user_id":"(.*?)"',str(rp1)).group(1)
-        print(f"{o}UserID: {vi}{uid}{S}")
+        print(f"{o}ID utilisateur : {vi}{uid}{S}")
     except requests.exceptions.ConnectionError:
-        sys.stdout.write(f"\r{r}Pas de Connection{S}\r")
+        sys.stdout.write(f"\r{r}Pas de connexion{S}\r")
         sys.stdout.flush()
         followers(link,cooks)
     except:
@@ -683,7 +705,7 @@ def followers(link, cooks):
     try:
         rq2=requests.post(f"https://i.instagram.com/api/v1/friendships/create/{uid}/", headers=headers).text
     except requests.exceptions.ConnectionError:
-        sys.stdout.write(f"\r{r}Pas de Connection{S}\r")
+        sys.stdout.write(f"\r{r}Pas de connexion{S}\r")
         sys.stdout.flush()
         followers(link,cooks)
     except:
@@ -742,10 +764,10 @@ def Tv(link, cooks):
     return rp1
 def main():
   clear()
-  print(f"{o}[{V}1{o}] Manuel Cookie")
-  print(f"{o}[{V}2{o}] Dump Cookie")
+  print(f"{o}[{V}1{o}] Cookie manuel")
+  print(f"{o}[{V}2{o}] Récupérer les cookies d'un fichier")
   print(f"{o}═════════════════════════════════════════")
-  sel=input(f"{o}[{V}?{o}] Choice: {B}")
+  sel=input(f"{o}[{V}?{o}] Votre choix : {B}")
   if sel=="1":
     cooks()
   elif sel=="2":
@@ -754,8 +776,8 @@ def main():
     main()
 def cooks():
   clear()
-  user=input(f"{o}[{V}?{o}]Username: {B}")
-  pwd=input(f"{o}[{V}?{o}]Password: {B}")
+  user=input(f"{o}[{V}?{o}]Nom d'utilisateur : {B}")
+  pwd=input(f"{o}[{V}?{o}]Mot de passe : {B}")
   uid = uuid4()
   url = "https://i.instagram.com/api/v1/accounts/login/"
   header0 = {
@@ -784,16 +806,16 @@ def cooks():
     print(e)
   if "ok" in rp1:
     cookies=str(rq1.cookies.get_dict())[1:-1].replace("'",'').replace(':','=').replace(',',';')
-    print(f"{B}[{V}Lariot{B}] {V}{user} {B}| {V}{pwd}")
+    print(f"{B}[{V}SUCCÈS{B}] {V}{user} {B}| {V}{pwd}")
     print(f"{B}[{V}COOKIE{B}] {V}{cookies}")
     s_acc=open(os.path.join(BASE_DIR, "insta-acct.txt"),'a')
     s_acc.write(f"{user}|{cookies}\n")
     s_acc.close()
     remove()
-    input(f"{o}[{B}•{o}]Enter For Back")
-    key()
+    input(f"{o}[{B}•{o}]Appuyez sur Entrée pour revenir en arrière")
+    main()
   else:
-    print(f"{B}[{R}!{B}]Incorrect {r}{user}{S} {B}| {r}{pwd}{S}")
+    print(f"{B}[{R}!{B}]Identifiants incorrects {r}{user}{S} {B}| {r}{pwd}{S}")
     time.sleep(2)
     cooks()
 def remove():
@@ -812,20 +834,20 @@ def remove():
   with open(input_file, 'w') as outfile:
       for line in unique_lines.values():
           outfile.write(line + '\n')
-  print(f"{B}[{V}√{B}] Auto Remove Duplicates Succes")
+  print(f"{B}[{V}√{B}] Suppression automatique des doublons réussie")
 
 def dump():
   global comptes
   os.system("clear")
   print(logo)
-  path=input(f"{o}[{V}+{o}]File Path: {B}")
+  path=input(f"{o}[{V}+{o}]Chemin du fichier : {B}")
   if os.path.exists(path):
     for x in open(path,'r').readlines():
       comptes.append(x.strip())
     base()
   else:
     os.system("clear")
-    i=(f"{r}No File Detected\n{S}")
+    i=(f"{r}Aucun fichier détecté\n{S}")
     for ix in i:
       print(ix,end='',flush=True)
       time.sleep(0.1)
@@ -864,7 +886,7 @@ def base():
       print(e)
     if "ok" in rp1:
       cookies=str(rq1.cookies.get_dict())[1:-1].replace("'",'').replace(':','=').replace(',',';')
-      print(f"{B}[{V}Lariot{B}] {V}{user} {B}| {V}{pwd}")
+      print(f"{B}[{V}SUCCÈS{B}] {V}{user} {B}| {V}{pwd}")
       print(f"{B}[{V}COOKIE{B}] {V}{cookies}")
       s_acc=open(os.path.join(BASE_DIR, "insta-acct.txt"),'a')
       s_acc.write(f"{user}|{cookies}\n")
@@ -872,59 +894,68 @@ def base():
       remove()
       continue
     else:
-      print(f"{B}[{R}!{B}]Incorrect {r}{user}{S} {B}| {r}{pwd}{S}")
+      print(f"{B}[{R}!{B}]Identifiants incorrects {r}{user}{S} {B}| {r}{pwd}{S}")
       continue
-  input(f"{o}[{B}•{o}]Enter For Back")
+  input(f"{o}[{B}•{o}]Appuyez sur Entrée pour revenir en arrière")
   main()
+
+def verify_online_subscription(key_to_check, auth_file):
+    """Vérifie la clé d'abonnement en ligne et met à jour le fichier local."""
+    api_url = f"https://passportdl.pythonanywhere.com/api/check_status?key={key_to_check}"
+    print(f"{Bl}Vérification de l'abonnement en ligne...{S}")
+    try:
+        response = requests.get(api_url, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("status") == "active" and "expires_on" in data:
+                expire_str = data["expires_on"]
+                with open(auth_file, 'w') as f:
+                    f.write(key_to_check + "\n")
+                    f.write(expire_str + "\n")
+                print(f"{V}Abonnement activé avec succès ! Expire le : {expire_str}{S}")
+                time.sleep(3)
+                return True
+            else:
+                print(f"{R}La clé n'est pas valide ou l'abonnement est inactif.{S}")
+                print(f"{J}Message du serveur : {data.get('message', 'Aucun message')}{S}")
+                time.sleep(3)
+                return False
+        else:
+            print(f"{R}Erreur du serveur de vérification (Code: {response.status_code}).{S}")
+            return False
+    except requests.exceptions.RequestException as e:
+        print(f"{R}Impossible de contacter le serveur de vérification : {e}{S}")
+        return False
 
 def key():
     auth_file = os.path.expanduser("~/.smmkingdom_auth")
     
-    while True: # Boucle pour revérifier après paiement
-        if os.path.exists(auth_file):
-            with open(auth_file, 'r') as f:
-                lines = f.read().splitlines()
-                if len(lines) >= 2:
-                    expire_str = lines[1].strip()
-                    try:
-                        expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
-                        if expire_date >= datetime.datetime.now():
-                            menu()
-                            return
-                        else:
-                            print(f"{r}Votre abonnement a expiré le {expire_str}.{S}")
-                    except (ValueError, IndexError):
-                        print(f"{r}Fichier d'autorisation corrompu ou date invalide.{S}")
-                else:
-                    print(f"{r}Fichier d'autorisation corrompu.{S}")
+    # Générer une clé unique pour cette tentative de paiement
+    av = "Pro"
+    ar = "JK"
+    centre = "".join(random.SystemRandom().choice("AZERTYUIOPQSDFGHJKLMWXCVBNabcdefghijklmnopqrstuvwxyz") for i in range(30))
+    apv = f"{av}{centre}{ar}"
+    os.system("clear")
+    
+    la = (f"{r}Vous n'êtes pas encore approuvé pour cet outil.{S}\n"
+          f"{B}[{V}≈{B}] {Bl}Votre clé: {o}{apv}\n"
+          f"{B}[{V}≈{B}]{Bl} Veuillez copier cette clé et l'utiliser sur le site de paiement.\n"
+          f"{B}[{V}≈{B}] {Bl}Site de paiement: {o}https://passportdl.pythonanywhere.com/\n")
+    
+    for lax in la:
+        print(lax, end='', flush=True)
+        time.sleep(0.05)
+    
+    time.sleep(2)
+    ouvrir_site_paiement()
+    
+    while True:
+        input(f"\n{J}Appuyez sur Entrée APRÈS avoir effectué le paiement pour vérifier...{S}")
+        if verify_online_subscription(apv, auth_file):
+            menu() # L'abonnement est actif, on lance le menu
+            break
         else:
-            print(f"{r}Aucun fichier d'abonnement trouvé.{S}")
-
-        # Si l'abonnement n'est pas valide, générer une clé et demander le paiement
-        av = "Pro"
-        ar = "JK"
-        centre = "".join(random.SystemRandom().choice("AZERTYUIOPQSDFGHJKLMWXCVBNabcdefghijklmnopqrstuvwxyz") for i in range(30))
-        apv = f"{av}{centre}{ar}"
-        os.system("clear")
-        
-        la = (f"{r}Vous n'êtes pas encore approuvé pour cet outil.{S}\n"
-              f"{B}[{V}≈{B}] {Bl}Votre clé: {o}{apv}\n"
-              f"{B}[{V}≈{B}]{Bl} Veuillez copier votre clé et payer sur le site.\n"
-              f"{B}[{V}≈{B}] {Bl}Site de paiement: {o}https://passportdl.pythonanywhere.com/\n")
-        
-        for lax in la:
-            print(lax, end='', flush=True)
-            time.sleep(0.05)
-        
-        with open(auth_file, 'w') as lar:
-            lar.write(apv + "\n")
-            # N'écrit pas de date d'expiration par défaut
-        
-        time.sleep(2)
-        ouvrir_site_paiement()
-        
-        input(f"\n{J}Appuyez sur Entrée après avoir effectué le paiement pour vérifier...{S}")
-        # La boucle va maintenant recommencer et revérifier le fichier d'abonnement
+            print(f"{J}Veuillez réessayer la vérification ou contacter le support si le problème persiste.{S}")
 
 def check_subscription():
     auth_file = os.path.expanduser("~/.smmkingdom_auth")
@@ -932,15 +963,22 @@ def check_subscription():
         with open(auth_file, 'r') as f:
             lines = f.read().splitlines()
             if len(lines) >= 2:
-                expire_str = lines[1].strip()
+                key, expire_str = lines[0].strip(), lines[1].strip()
                 try:
                     expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
                     if expire_date >= datetime.datetime.now():
-                        return True
+                        print(f"{V}Abonnement local valide trouvé. Expire le: {expire_str}{S}")
+                        time.sleep(2)
+                        menu()
+                        return
+                    else:
+                        print(f"{r}Votre abonnement local a expiré le {expire_str}.{S}")
                 except (ValueError, IndexError):
-                    pass # Fichier corrompu, sera géré par key()
-    key() # Appelle key si l'abonnement n'est pas valide
-    return False
+                    pass # Fichier corrompu, on continue pour appeler key()
+    
+    # Si aucun abonnement local valide n'est trouvé, on lance le processus de clé
+    key()
+    return
 
 def ouvrir_site_paiement():
     url = "https://passportdl.pythonanywhere.com"
@@ -957,10 +995,10 @@ def ouvrir_site_paiement():
         elif sys.platform.startswith('darwin'):
             os.system(f"open {url}")
         else:
-            print(f"Veuillez ouvrir ce lien dans votre navigateur: {url}")
+            print(f"Veuillez ouvrir ce lien dans votre navigateur : {url}")
     except Exception as e:
-        print(f"{R}Impossible d'ouvrir le navigateur automatiquement. Erreur: {e}{S}")
-        print(f"Veuillez ouvrir ce lien manuellement: {url}")
+        print(f"{R}Impossible d'ouvrir le navigateur automatiquement. Erreur : {e}{S}")
+        print(f"Veuillez ouvrir ce lien manuellement : {url}")
 
 def update_bot():
     clear()
@@ -992,7 +1030,7 @@ def manage_insta_accounts():
     clear()
     path = os.path.join(BASE_DIR, "insta-acct.txt")
     if not os.path.exists(path):
-        print(f"{r}No Instagram accounts file found.{S}")
+        print(f"{r}Le fichier des comptes Instagram (insta-acct.txt) est introuvable.{S}")
         time.sleep(2)
         menu()
         return
@@ -1001,20 +1039,20 @@ def manage_insta_accounts():
         accounts = f.readlines()
 
     if not accounts:
-        print(f"{r}No Instagram accounts found in the file.{S}")
+        print(f"{r}Aucun compte Instagram n'a été trouvé dans le fichier.{S}")
         time.sleep(2)
         menu()
         return
 
-    print(f"{o}--- Instagram Accounts ---{S}")
+    print(f"{o}--- Comptes Instagram ---{S}")
     for i, acc_line in enumerate(accounts):
         user = acc_line.strip().split('|')[0]
         print(f"{o}[{V}{i+1}{o}] {B}{user}{S}")
     print(f"{o}--------------------------{S}")
-    print(f"{o}[{V}0{o}] Back to menu")
+    print(f"{o}[{V}0{o}] Retour au menu")
 
     try:
-        choice = input(f"{o}[{V}?{o}] Select an account to delete (or 0 to go back): {B}")
+        choice = input(f"{o}[{V}?{o}] Sélectionnez un compte à supprimer (ou 0 pour revenir) : {B}")
         choice_index = int(choice)
 
         if choice_index == 0:
@@ -1028,23 +1066,22 @@ def manage_insta_accounts():
             with open(path, 'w') as f:
                 f.writelines(accounts)
             
-            print(f"{V}Account '{account_to_delete}' has been deleted.{S}")
+            print(f"{V}Le compte '{account_to_delete}' a été supprimé.{S}")
             time.sleep(2)
             manage_insta_accounts()
         else:
-            print(f"{r}Invalid choice.{S}")
+            print(f"{r}Choix invalide.{S}")
             time.sleep(2)
             manage_insta_accounts()
 
     except ValueError:
-        print(f"{r}Invalid input. Please enter a number.{S}")
+        print(f"{r}Entrée invalide. Veuillez saisir un numéro.{S}")
         time.sleep(2)
         manage_insta_accounts()
 
 if __name__ == "__main__":
     try:
         check_subscription()
-        # Si check_subscription passe (ou appelle key qui ensuite appelle menu), la boucle principale est dans menu()
     except KeyboardInterrupt:
         print(f"\n{R}Interruption détectée. Fermeture du script...{S}")
     finally:
