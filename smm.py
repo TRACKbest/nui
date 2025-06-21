@@ -36,15 +36,16 @@ co='\033[1;46m'
 
 logo = f"""
 {o}════════════════════════════════════════════════════════════
-{vi}┌──────────────────────────────┐        {V}2025
-│   _____  __  __  __  __        │
-│  / ____||  \/  ||  \/  |       │
-│ | (___  | \  / || \  / |       │
-│  \___ \ | |\/| || |\/| |       │
-│  ____) || |  | || |  | |       │
-│ |_____/ |_|  |_||_|  |_|       │
-│                                │
-└──────────────────────────────┘
+{vi}┌──────────────────────────────────────────────┐        {V}2025
+│   ______              _       _           _     │
+│  |  ____|            | |     | |         | |    │
+│  | |__  __  ___ __ __| | __ _| |__   __ _| |_   │
+│  |  __| \ \/ / '__/ _` |/ _` | '_ \ / _` | __|  │
+│  | |____ >  <| | | (_| | (_| | | | | (_| | |_   │
+│  |______/_/\_\_|  \__,_|\__, |_| |_|\__,_|\__|  │
+│                         __/ |                  │
+│                        |___/                   │
+└──────────────────────────────────────────────┘
 {o}════════════════════════════════════════════════════════════
 {B}[{V}•{B}]{o} Projet       : {vi}real{V}(proj)
 {B}[{V}•{B}]{o} Auteur       : {vi}Fares Alex
@@ -52,6 +53,7 @@ logo = f"""
 {B}[{V}•{B}]{o} Version      : {vi}SmmKingdomTask {V}v{J}1.0
 {o}════════════════════════════════════════════════════════════
 """
+
 clien=[]
 var1=[]
 var2=[]
@@ -324,7 +326,7 @@ def account():
   global clien
   client=clien[0]
   while True:
-    path=os.path.join(BASE_DIR, "insta-acc.txt")
+    path=os.path.join(BASE_DIR, "insta-acct.txt")
     if os.path.exists(path):
       for x in open(path,'r').readlines():
         acc=x.strip()
@@ -373,7 +375,7 @@ def account():
           continue
     else:
       os.system("clear")
-      u=(f"{r}No File /sdcard/SmmKingdomTask/insta-acc.txt Detected\n{S}")
+      u=(f"{r}No File /sdcard/SmmKingdomTask/insta-acct.txt Detected\n{S}")
       for ix in u:
         print(ix,end='',flush=True)
         time.sleep(0.1)
@@ -764,7 +766,7 @@ def cooks():
     cookies=str(rq1.cookies.get_dict())[1:-1].replace("'",'').replace(':','=').replace(',',';')
     print(f"{B}[{V}Lariot{B}] {V}{user} {B}| {V}{pwd}")
     print(f"{B}[{V}COOKIE{B}] {V}{cookies}")
-    s_acc=open(os.path.join(BASE_DIR, "insta-acc.txt"),'a')
+    s_acc=open(os.path.join(BASE_DIR, "insta-acct.txt"),'a')
     s_acc.write(f"{user}|{cookies}\n")
     s_acc.close()
     remove()
@@ -777,7 +779,7 @@ def cooks():
 def remove():
   global user
   user=[]
-  input_file = os.path.join(BASE_DIR, "insta-acc.txt")
+  input_file = os.path.join(BASE_DIR, "insta-acct.txt")
   user.append(input_file)
   unique_ids = {}
   with open(input_file, 'r') as infile:
@@ -869,7 +871,7 @@ def base():
       cookies=str(rq1.cookies.get_dict())[1:-1].replace("'",'').replace(':','=').replace(',',';')
       print(f"{B}[{V}Lariot{B}] {V}{user} {B}| {V}{pwd}")
       print(f"{B}[{V}COOKIE{B}] {V}{cookies}")
-      s_acc=open(os.path.join(BASE_DIR, "insta-acc.txt"),'a')
+      s_acc=open(os.path.join(BASE_DIR, "insta-acct.txt"),'a')
       s_acc.write(f"{user}|{cookies}\n")
       s_acc.close()
       remove()
