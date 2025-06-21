@@ -449,7 +449,7 @@ def account():
             print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
           
             time.sleep(2)
-            continue
+            return None
         elif "▪️ Action :" in mss:
           task(cooks,user)
           continue
@@ -547,7 +547,7 @@ def task(cooks,user):
         print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
         
         time.sleep(2)
-        continue
+        return None
     elif "🟡 Account" in mss:
       print(f"{co}{mss}{S}")
       
