@@ -96,6 +96,7 @@ def menu():
   print(f"{o}[{V}2{o}] Get Account")
   print(f"{o}[{V}3{o}] Get Cookies")
   print(f"{o}[{V}4{o}] Deconnection T/G")
+  print(f"{o}[{V}5{o}] List/Delete Instagram Account")
   print(f"{o}[{V}0{o}] Exit")
   print(f"{o}═════════════════════════════════════════")
   sel=input(f"{o}[{V}?{o}] Choice: {B}")
@@ -114,6 +115,8 @@ def menu():
     print(f"{r}Deconnected{S}")
     time.sleep(4)
     menu()
+  elif sel=="5":
+    manage_insta_accounts()
   elif sel=="0":
     exit()
   else:
@@ -821,21 +824,22 @@ def remove1():
     print(f"{B}[{V}√{B}] Auto Remove Succes")
   return "ok"
 def dump():
-	global comptes
-	os.system("clear")
-	print(logo)
-	path=input(f"{o}[{V}+{o}]File Path: {B}")
-	if os.path.exists(path):
-		for x in open(path,'r').readlines():
-			comptes.append(x.strip())
-		base()
-	else:
-		os.system("clear")
-		i=(f"{r}No File Detected\n{S}")
-		for ix in i:
-		  print(ix,end='',flush=True)
-		  time.sleep(0.1)
-		dump()
+  global comptes
+  os.system("clear")
+  print(logo)
+  path=input(f"{o}[{V}+{o}]File Path: {B}")
+  if os.path.exists(path):
+    for x in open(path,'r').readlines():
+      comptes.append(x.strip())
+    base()
+  else:
+    os.system("clear")
+    i=(f"{r}No File Detected\n{S}")
+    for ix in i:
+      print(ix,end='',flush=True)
+      time.sleep(0.1)
+    dump()
+
 def base():
   global comptes
   for acc in comptes:
@@ -946,4 +950,57 @@ def ouvrir_site_paiement():
         os.system(f"open {url}")
     else:
         print(f"Va sur {url}")
+def manage_insta_accounts():
+    clear()
+    path = os.path.join(BASE_DIR, "insta-acct.txt")
+    if not os.path.exists(path):
+        print(f"{r}No Instagram accounts file found.{S}")
+        time.sleep(2)
+        menu()
+        return
+
+    with open(path, 'r') as f:
+        accounts = f.readlines()
+
+    if not accounts:
+        print(f"{r}No Instagram accounts found in the file.{S}")
+        time.sleep(2)
+        menu()
+        return
+
+    print(f"{o}--- Instagram Accounts ---{S}")
+    for i, acc_line in enumerate(accounts):
+        user = acc_line.strip().split('|')[0]
+        print(f"{o}[{V}{i+1}{o}] {B}{user}{S}")
+    print(f"{o}--------------------------{S}")
+    print(f"{o}[{V}0{o}] Back to menu")
+
+    try:
+        choice = input(f"{o}[{V}?{o}] Select an account to delete (or 0 to go back): {B}")
+        choice_index = int(choice)
+
+        if choice_index == 0:
+            menu()
+            return
+        
+        if 1 <= choice_index <= len(accounts):
+            account_to_delete = accounts[choice_index - 1].strip().split('|')[0]
+            del accounts[choice_index - 1]
+            
+            with open(path, 'w') as f:
+                f.writelines(accounts)
+            
+            print(f"{V}Account '{account_to_delete}' has been deleted.{S}")
+            time.sleep(2)
+            manage_insta_accounts()
+        else:
+            print(f"{r}Invalid choice.{S}")
+            time.sleep(2)
+            manage_insta_accounts()
+
+    except ValueError:
+        print(f"{r}Invalid input. Please enter a number.{S}")
+        time.sleep(2)
+        manage_insta_accounts()
+
 menu()
