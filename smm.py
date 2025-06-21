@@ -44,9 +44,9 @@ logo = f"""
 │   ______              _       _           _     │
 │  |  ____|            | |     | |         | |    │
 │  | |__  __  ___ __ __| | __ _| |__   __ _| |_   │
-│  |  __| \ \/ / '__/ _` |/ _` | '_ \ / _` | __|  │
+│  |  __| \\ \\/ / '__/ _` |/ _` | '_ \\ / _` | __|  │
 │  | |____ >  <| | | (_| | (_| | | | | (_| | |_   │
-│  |______/_/\_\_|  \__,_|\__, |_| |_|\__,_|\__|  │
+│  |______/_/\\_\\_|  \\__,_|\\__, |_| |_|\\__,_|\\__|  │
 │                         __/ |                  │
 │                        |___/                   │
 └──────────────────────────────────────────────┘
@@ -54,7 +54,7 @@ logo = f"""
 {B}[{V}•{B}]{o} Projet       : {vi}real{V}(proj)
 {B}[{V}•{B}]{o} Auteur       : {vi}Fares Alex
 {B}[{V}•{B}]{o} Statut       : {vi}rest
-{B}[{V}•{B}]{o} Version      : {vi}SmmKingdomTask {V}v{J}1.0
+{B}[{V}•{B}]{o} Version      : {vi}SmmKingdomTask {V}v{J}1.1
 {o}════════════════════════════════════════════════════════════
 """
 
@@ -70,6 +70,21 @@ session = "sessions"
 BASE_DIR = os.path.join(os.path.dirname(__file__), "SmmKingdomTask")
 if not os.path.exists(BASE_DIR):
     os.makedirs(BASE_DIR)
+ON_HOLD_FILE = os.path.join(BASE_DIR, "on_hold_accounts.txt")
+
+def load_on_hold_accounts():
+    global accounts_with_no_tasks
+    if os.path.exists(ON_HOLD_FILE):
+        with open(ON_HOLD_FILE, 'r') as f:
+            accounts_with_no_tasks = [line.strip() for line in f.readlines() if line.strip()]
+    else:
+        accounts_with_no_tasks = []
+
+def save_on_hold_accounts():
+    with open(ON_HOLD_FILE, 'w') as f:
+        for user in accounts_with_no_tasks:
+            f.write(user + '\n')
+
 peer = "SmmKingdomTasksBot"
 api_id = 2040
 api_hash = "b18441a1ff607e10a989891a5462e627"
@@ -102,7 +117,8 @@ def menu():
   print(f"{o}[{V}3{o}] Obtenir les cookies d'un compte")
   print(f"{o}[{V}4{o}] Déconnexion Telegram")
   print(f"{o}[{V}5{o}] Gérer les comptes Instagram")
-  print(f"{o}[{V}6{o}] Mettre à jour le Bot")
+  print(f"{o}[{V}6{o}] Gérer les comptes en attente")
+  print(f"{o}[{V}7{o}] Mettre à jour le Bot")
   print(f"{o}[{V}0{o}] Quitter")
   print(f"{o}═════════════════════════════════════════")
   sel=input(f"{o}[{V}?{o}] Votre choix : {B}")
@@ -125,6 +141,8 @@ def menu():
   elif sel=="5":
     manage_insta_accounts()
   elif sel=="6":
+    manage_on_hold_accounts()
+  elif sel=="7":
     update_bot()
   elif sel=="0":
     exit()
@@ -372,12 +390,29 @@ def insta():
 def account():
   global clien
   client=clien[0]
+  load_on_hold_accounts()
   while True:
     path=os.path.join(BASE_DIR, "insta-acct.txt")
     if os.path.exists(path):
-      for x in open(path,'r').readlines():
+      
+      all_accounts = open(path, 'r').readlines()
+      active_accounts_exist = any(line.strip().split('|')[0] not in accounts_with_no_tasks for line in all_accounts)
+
+      if not active_accounts_exist:
+          print(f"{J}Tous les comptes sont en attente ou le fichier est vide.{S}")
+          print(f"{J}Utilisez l'option 6 du menu pour réactiver des comptes.{S}")
+          time.sleep(4)
+          menu()
+          return
+
+      for x in all_accounts:
         acc=x.strip()
+        if not acc: continue
         user=acc.split("|")[0]
+        
+        if user in accounts_with_no_tasks:
+            continue
+
         cooks=acc.split("|")[1]
         uid="3218350887150471448"
         like=likes1(uid,cooks)
@@ -410,16 +445,17 @@ def account():
           print(f"{J}[!] 'Sorry' reçu. Aucune tâche pour {user} pour le moment.{S}")
           if user not in accounts_with_no_tasks:
             accounts_with_no_tasks.append(user)
-            print(f"{J}[-] {user} ajouté à la liste d'attente pour cette session.{S}")
-          client.send_message(entity=channel_entity, message="🔙Back")
-          time.sleep(2)
-          continue
+            save_on_hold_accounts()
+            print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
+          
+            time.sleep(2)
+            continue
         elif "▪️ Action :" in mss:
           task(cooks,user)
           continue
         elif "🟡 Account" in mss:
           print(f"{co}{mss}{S}")
-          client.send_message(entity=channel_entity, message="🔙Back")
+         
           time.sleep(2)
           # On tente de renouveler le cookie pour ce compte
           new_cookie = renew_and_update_cookie(user)
@@ -507,13 +543,14 @@ def task(cooks,user):
       print(f"{J}[!] 'Sorry' reçu. Aucune tâche pour {user} pour le moment.{S}")
       if user not in accounts_with_no_tasks:
         accounts_with_no_tasks.append(user)
-        print(f"{J}[-] {user} ajouté à la liste d'attente pour cette session.{S}")
-      client.send_message(entity=channel_entity, message="🔙Back")
-      time.sleep(2)
-      return None
+        save_on_hold_accounts()
+        print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
+        
+        time.sleep(2)
+        continue
     elif "🟡 Account" in mss:
       print(f"{co}{mss}{S}")
-      client.send_message(entity=channel_entity, message="🔙Back")
+      
       time.sleep(2)
       new_cookie = renew_and_update_cookie(user)
       if new_cookie:
@@ -1152,8 +1189,143 @@ def change_telegram_account():
     print(f"{J}La prochaine fois que vous démarrerez les tâches (option 1), il vous sera demandé un nouveau numéro.{S}")
     time.sleep(4)
 
+def attempt_login_and_get_cookie(user, pwd):
+    """Tente de se connecter et retourne les cookies en cas de succès."""
+    uid = uuid4()
+    url = "https://i.instagram.com/api/v1/accounts/login/"
+    header0 = {
+        'User-Agent': 'Instagram 113.0.0.39.122 Android (24/5.0; 515dpi; 1440x2416; huawei/google; Nexus 6P; angler; angler; en_US)',
+        "Accept": "*/*", "Accept-Encoding": "gzip, deflate", "Accept-Language": "en-US",
+        "X-IG-Capabilities": "3brTvw==", "X-IG-Connection-Type": "WIFI",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        'Host': 'i.instagram.com', 'Connection': 'keep-alive'
+    }
+    data1 = {
+        'uuid': uid, 'password': pwd, 'username': user, 'device_id': uid,
+        'from_reg': 'false', '_csrftoken': 'YcJzPesTYxMTfmpSOiVn3pfRAJdrETFD',
+        'login_attempt_countn': '0'
+    }
+    try:
+        rq_session = requests.session()
+        rq1 = rq_session.post(url=url, headers=header0, data=data1, timeout=15)
+        rp1 = rq1.text
+        if "ok" in rp1 and "logged_in_user" in rp1:
+            cookies = str(rq1.cookies.get_dict())[1:-1].replace("'", '').replace(':', '=').replace(',', ';')
+            return cookies
+    except requests.exceptions.RequestException as e:
+        print(f"{R}Erreur de connexion lors de la tentative de login: {e}{S}")
+        return None
+    except Exception as e:
+        print(f"{R}Erreur inattendue lors du login: {e}{S}")
+        return None
+    return None
+
+def renew_and_update_cookie(user):
+    """
+    Tente de renouveler le cookie pour un utilisateur en utilisant les identifiants
+    sauvegardés et met à jour le fichier insta-acct.txt.
+    Retourne le nouveau cookie en cas de succès, sinon None.
+    """
+    print(f"{J}[!] Tentative de renouvellement du cookie pour {user}...{S}")
+    
+    # 1. Trouver le mot de passe
+    pwd_path = os.path.join(BASE_DIR, "Compte.txt")
+    password = None
+    if os.path.exists(pwd_path):
+        with open(pwd_path, 'r') as f:
+            for line in f:
+                if line.strip().startswith(f"{user}|"):
+                    try:
+                        password = line.strip().split('|', 1)[1]
+                        break
+                    except IndexError:
+                        continue
+    
+    if not password:
+        print(f"{R}[-] Mot de passe non trouvé pour '{user}' dans {pwd_path}.{S}")
+        print(f"{J}[-] Veuillez ajouter le compte via l'option 3 ou 5 du menu principal.{S}")
+        return None
+
+    # 2. Tenter de se connecter pour obtenir un nouveau cookie
+    new_cookie = attempt_login_and_get_cookie(user, password)
+    
+    if not new_cookie:
+        print(f"{R}[-] Échec de la connexion pour {user}. Le compte est peut-être bloqué ou les identifiants sont incorrects.{S}")
+        return None
+        
+    print(f"{V}[√] Connexion réussie. Nouveau cookie obtenu pour {user}.{S}")
+
+    # 3. Mettre à jour le cookie dans insta-acct.txt
+    accounts_path = os.path.join(BASE_DIR, "insta-acct.txt")
+    if not os.path.exists(accounts_path):
+        open(accounts_path, 'w').close()
+
+    lines = []
+    with open(accounts_path, 'r') as f:
+        lines = f.readlines()
+
+    updated = False
+    with open(accounts_path, 'w') as f:
+        for line in lines:
+            line_user = line.strip().split('|')[0]
+            if line_user == user:
+                f.write(f"{user}|{new_cookie}\n")
+                updated = True
+            else:
+                f.write(line)
+    
+    if not updated:
+        with open(accounts_path, 'a') as f:
+            f.write(f"{user}|{new_cookie}\n")
+
+    print(f"{V}[√] Fichier de cookies '{os.path.basename(accounts_path)}' mis à jour pour {user}.{S}")
+    return new_cookie
+
+def manage_on_hold_accounts():
+    clear()
+    load_on_hold_accounts() 
+
+    if not accounts_with_no_tasks:
+        print(f"{J}Aucun compte n'est actuellement en attente.{S}")
+        time.sleep(2)
+        menu()
+        return
+
+    print(f"{o}--- Comptes en attente (sans tâche) ---{S}")
+    for i, user in enumerate(accounts_with_no_tasks):
+        print(f"{o}[{V}{i+1}{o}] {B}{user}{S}")
+    print(f"{o}---------------------------------------{S}")
+    print(f"{o}[{V}0{o}] Retour au menu")
+
+    try:
+        choice = input(f"{o}[{V}?{o}] Sélectionnez un compte à réactiver (ou 0 pour revenir) : {B}")
+        choice_index = int(choice)
+
+        if choice_index == 0:
+            menu()
+            return
+        
+        if 1 <= choice_index <= len(accounts_with_no_tasks):
+            account_to_reactivate = accounts_with_no_tasks.pop(choice_index - 1)
+            
+            save_on_hold_accounts()
+            
+            print(f"{V}Le compte '{account_to_reactivate}' a été réactivé.{S}")
+            time.sleep(2)
+            manage_on_hold_accounts()
+        else:
+            print(f"{r}Choix invalide.{S}")
+            time.sleep(2)
+            manage_on_hold_accounts()
+
+    except ValueError:
+        print(f"{r}Entrée invalide. Veuillez saisir un numéro.{S}")
+        time.sleep(2)
+        manage_on_hold_accounts()
+
 if __name__ == "__main__":
     try:
+        load_on_hold_accounts()
         check_subscription()
     except KeyboardInterrupt:
         print(f"\n{R}Interruption détectée. Fermeture du script...{S}")
