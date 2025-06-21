@@ -54,7 +54,7 @@ logo = f"""
 {B}[{V}•{B}]{o} Projet       : {vi}real{V}(proj)
 {B}[{V}•{B}]{o} Auteur       : {vi}Fares Alex
 {B}[{V}•{B}]{o} Statut       : {vi}rest
-{B}[{V}•{B}]{o} Version      : {vi}SmmKingdomTask {V}v{J}1.1
+{B}[{V}•{B}]{o} Version      : {vi}SmmKingdomTask {V}v{J}1.0
 {o}════════════════════════════════════════════════════════════
 """
 
@@ -64,6 +64,7 @@ var2=[]
 var=[]
 compte=[]
 comptes=[]
+accounts_with_no_tasks = []
 rq=requests.session()
 session = "sessions"
 BASE_DIR = os.path.join(os.path.dirname(__file__), "SmmKingdomTask")
@@ -406,6 +407,12 @@ def account():
         print(f"{o}[{B}•{o}] Nom d'utilisateur : {v}{user}{S}")
         mss=message()
         if "Sorry" in mss:
+          print(f"{J}[!] 'Sorry' reçu. Aucune tâche pour {user} pour le moment.{S}")
+          if user not in accounts_with_no_tasks:
+            accounts_with_no_tasks.append(user)
+            print(f"{J}[-] {user} ajouté à la liste d'attente pour cette session.{S}")
+          client.send_message(entity=channel_entity, message="🔙Back")
+          time.sleep(2)
           continue
         elif "▪️ Action :" in mss:
           task(cooks,user)
@@ -414,6 +421,14 @@ def account():
           print(f"{co}{mss}{S}")
           client.send_message(entity=channel_entity, message="🔙Back")
           time.sleep(2)
+          # On tente de renouveler le cookie pour ce compte
+          new_cookie = renew_and_update_cookie(user)
+          if new_cookie:
+              print(f"{J}Cookie renouvelé. Reprise des tâches pour {user}...{S}")
+              time.sleep(2)
+              task(new_cookie, user)
+          else:
+              print(f"{R}Impossible de renouveler le cookie pour {user}. Passage au compte suivant...{S}")
           continue
         else:
           time.sleep(4)
@@ -427,7 +442,7 @@ def account():
         time.sleep(0.1)
       menu()
 def task(cooks,user):
-  global clien,var1
+  global clien,var1, accounts_with_no_tasks
   client=clien[0]
   try:
     channel_entity = client.get_entity("@SmmKingdomTasksBot")
@@ -489,9 +504,24 @@ def task(cooks,user):
         client.send_message(entity=channel_entity, message="✅Completed")
         task(cooks,user)
     elif "Sorry" in mss:
+      print(f"{J}[!] 'Sorry' reçu. Aucune tâche pour {user} pour le moment.{S}")
+      if user not in accounts_with_no_tasks:
+        accounts_with_no_tasks.append(user)
+        print(f"{J}[-] {user} ajouté à la liste d'attente pour cette session.{S}")
+      client.send_message(entity=channel_entity, message="🔙Back")
+      time.sleep(2)
       return None
     elif "🟡 Account" in mss:
-      return None
+      print(f"{co}{mss}{S}")
+      client.send_message(entity=channel_entity, message="🔙Back")
+      time.sleep(2)
+      new_cookie = renew_and_update_cookie(user)
+      if new_cookie:
+          print(f"{J}Cookie renouvelé avec succès. Reprise des tâches...{S}")
+          task(new_cookie, user)
+      else:
+          print(f"{R}Impossible de renouveler le cookie. Le compte nécessite une intervention manuelle.{S}")
+          return None
     else:
       if "Completed" in mss:
         i = 0
