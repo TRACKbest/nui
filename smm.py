@@ -17,6 +17,8 @@ from random import choice
 from concurrent.futures import ThreadPoolExecutor as tpe
 import webbrowser
 import datetime
+import sqlite3
+import shutil
 
 vi='\033[1;35m'
 R='\033[1;91m'
@@ -95,7 +97,7 @@ def menu():
   global var
   clear()
   print(f"{o}[{V}1{o}] Démarrer les tâches automatiques")
-  print(f"{o}[{V}2{o}] Obtenir un compte Instagram")
+  print(f"{o}[{V}2{o}] Changer le compte Telegram")
   print(f"{o}[{V}3{o}] Obtenir les cookies d'un compte")
   print(f"{o}[{V}4{o}] Déconnexion Telegram")
   print(f"{o}[{V}5{o}] Gérer les comptes Instagram")
@@ -104,11 +106,12 @@ def menu():
   print(f"{o}═════════════════════════════════════════")
   sel=input(f"{o}[{V}?{o}] Votre choix : {B}")
   if sel=="1":
+    var.clear()
     var.append("1")
     number()
   elif sel=="2":
-    var.append("2")
-    number()
+    change_telegram_account()
+    menu()
   elif sel=="3":
     main()
   elif sel=="4":
@@ -161,7 +164,8 @@ def telegram(phone, return_data):
         client.connect()
     except sqlite3.OperationalError as e:
         if "database is locked" in str(e):
-            print(f"{R}La base de données de session est verrouillée. Veuillez fermer tous les autres processus du bot et réessayer.{S}")
+            print(f"{R}La base de données de session est verrouillée.{S}")
+            print(f"{J}Cela peut se produire si le script a été mal arrêté. Essayez de supprimer le dossier 'sessions' et réessayez.{S}")
             time.sleep(5)
             exit()
         else:
@@ -776,8 +780,16 @@ def main():
     main()
 def cooks():
   clear()
-  user=input(f"{o}[{V}?{o}]Nom d'utilisateur : {B}")
-  pwd=input(f"{o}[{V}?{o}]Mot de passe : {B}")
+  user=input(f"{o}[{V}?{o}]Nom d'utilisateur (ou 0 pour annuler) : {B}")
+  if user == '0':
+      main()
+      return
+      
+  pwd=input(f"{o}[{V}?{o}]Mot de passe (ou 0 pour annuler) : {B}")
+  if pwd == '0':
+      main()
+      return
+
   uid = uuid4()
   url = "https://i.instagram.com/api/v1/accounts/login/"
   header0 = {
@@ -812,8 +824,16 @@ def cooks():
     s_acc.write(f"{user}|{cookies}\n")
     s_acc.close()
     remove()
-    input(f"{o}[{B}•{o}]Appuyez sur Entrée pour revenir en arrière")
-    main()
+    while True:
+        choice = input(f"{o}[{V}?{o}] Ajouter un autre compte ? (o/n) : {B}").lower()
+        if choice == 'o':
+            cooks()
+            return
+        elif choice == 'n':
+            main()
+            return
+        else:
+            print(f"{R}Choix invalide. Veuillez répondre par 'o' ou 'n'.{S}")
   else:
     print(f"{B}[{R}!{B}]Identifiants incorrects {r}{user}{S} {B}| {r}{pwd}{S}")
     time.sleep(2)
@@ -1079,6 +1099,29 @@ def manage_insta_accounts():
         time.sleep(2)
         manage_insta_accounts()
 
+def change_telegram_account():
+    clear()
+    print(f"{J}Cette option va supprimer le compte Telegram sauvegardé pour vous permettre d'en connecter un nouveau.{S}")
+    time.sleep(2)
+    
+    # Supprimer le numéro de téléphone sauvegardé
+    if os.path.exists("number.txt"):
+        os.remove("number.txt")
+        print(f"{V}Ancien numéro de téléphone supprimé.{S}")
+
+    # Supprimer le dossier de session pour forcer une nouvelle connexion complète
+    session_dir = "sessions"
+    if os.path.exists(session_dir):
+        try:
+            shutil.rmtree(session_dir)
+            print(f"{V}Ancien dossier de session supprimé.{S}")
+        except OSError as e:
+            print(f"{R}Erreur lors de la suppression du dossier de session : {e}.{S}")
+
+    print(f"\n{V}Réinitialisation terminée.{S}")
+    print(f"{J}La prochaine fois que vous démarrerez les tâches (option 1), il vous sera demandé un nouveau numéro.{S}")
+    time.sleep(4)
+
 if __name__ == "__main__":
     try:
         check_subscription()
@@ -1087,7 +1130,10 @@ if __name__ == "__main__":
     finally:
         if clien and clien[0].is_connected():
             print(f"{Bl}Déconnexion du client Telegram...{S}")
-            clien[0].disconnect()
+            try:
+                clien[0].disconnect()
+            except sqlite3.OperationalError as e:
+                print(f"{J}Avertissement : La base de données de session était verrouillée lors de la déconnexion. {e}{S}")
         print(f"{V}Script terminé.{S}")
 
 menu()
