@@ -68,6 +68,7 @@ accounts_with_no_tasks = []
 rq=requests.session()
 session = "sessions"
 BASE_DIR = os.path.join(os.path.dirname(__file__), "SmmKingdomTask")
+APP_URL = "https://faresalex.pythonanywhere.com"
 if not os.path.exists(BASE_DIR):
     os.makedirs(BASE_DIR)
 ON_HOLD_FILE = os.path.join(BASE_DIR, "on_hold_accounts.txt")
@@ -239,9 +240,42 @@ def telegram(phone, return_data):
             pw2fa = input("[?] Entrez le mot de passe (2FA) : ")
             client.sign_in(phone=phone, password=pw2fa)
 
-    
+    me = client.get_me()
+
+    print(f"{Bl}Vérification de l'abonnement...{S}")
+    telegram_username = me.username
+    if not telegram_username:
+        print(f"{R}Votre compte Telegram n'a pas de nom d'utilisateur.{S}")
+        print(f"{J}Veuillez définir un nom d'utilisateur dans les paramètres Telegram et réessayer.{S}")
+        exit()
+
+    try:
+        api_url = f"{APP_URL}/api/user_status/{telegram_username}"
+        response = requests.get(api_url, timeout=15)
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"{V}Abonnement actif pour {data.get('email')}. Jours restants: {data.get('days_left')}{S}")
+            time.sleep(2)
+        elif response.status_code == 403:
+            data = response.json()
+            print(f"{R}Abonnement inactif pour @{telegram_username}.{S}")
+            print(f"{R}Raison: {data.get('message')}{S}")
+            print(f"{J}Veuillez visiter {APP_URL} pour vous inscrire ou renouveler.{S}")
+            exit()
+        elif response.status_code == 404:
+            print(f"{R}Utilisateur Telegram @{telegram_username} non trouvé.{S}")
+            print(f"{J}Veuillez visiter {APP_URL} pour vous inscrire.{S}")
+            exit()
+        else:
+            print(f"{R}Erreur du serveur de vérification (Code: {response.status_code}).{S}")
+            exit()
+
+    except requests.exceptions.RequestException as e:
+        print(f"{R}Impossible de contacter le serveur de vérification : {e}{S}")
+        exit()
+
     if not return_data:
-        me = client.get_me()
         print(f"[√] Compte : {me.first_name} {me.last_name}")
         print("═════════════════════════════════════════")
 
@@ -986,161 +1020,6 @@ def base():
   input(f"{o}[{B}•{o}]Appuyez sur Entrée pour revenir en arrière")
   main()
 
-def verify_online_subscription(key_to_check, auth_file):
-    """
-    Vérifie la clé d'abonnement en ligne.
-    En cas de succès, met à jour le fichier local avec la date d'expiration du serveur.
-    En cas d'échec de connexion, se rabat sur la vérification du fichier local.
-    Retourne (True, "message") en cas de succès, (False, "message") en cas d'échec.
-    """
-    api_url = f"https://passportdl.pythonanywhere.com/api/check_status?key={key_to_check}"
-    print(f"{Bl}Vérification de l'abonnement en ligne...{S}")
-    try:
-        response = requests.get(api_url, timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("status") == "active" and "expires_on" in data:
-                expire_str = data["expires_on"]
-                with open(auth_file, 'w') as f:
-                    f.write(key_to_check + "\n")
-                    f.write(expire_str + "\n")
-                return True, f"{V}Abonnement vérifié en ligne. Expire le : {expire_str}{S}"
-            else:
-                msg = data.get('message', 'Aucun message')
-                if os.path.exists(auth_file):
-                    os.remove(auth_file)
-                return False, f"{R}La clé n'est pas valide ou l'abonnement est inactif. Message: {msg}{S}"
-        else:
-            return False, f"{R}Erreur du serveur de vérification (Code: {response.status_code}). Tentative de vérification locale.{S}"
-
-    except requests.exceptions.RequestException as e:
-        print(f"{R}Impossible de contacter le serveur de vérification : {e}{S}")
-        print(f"{J}Vérification de l'abonnement local comme alternative...{S}")
-        if os.path.exists(auth_file):
-            with open(auth_file, 'r') as f:
-                lines = f.read().splitlines()
-            if len(lines) >= 2:
-                local_key, expire_str = lines[0].strip(), lines[1].strip()
-                if local_key == key_to_check:
-                    try:
-                        expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
-                        if expire_date >= datetime.datetime.now():
-                            remaining_days = (expire_date - datetime.datetime.now()).days
-                            return True, f"{V}Mode hors-ligne: Abonnement local valide. {remaining_days} jours restants.{S}"
-                        else:
-                            return False, f"{R}Mode hors-ligne: Abonnement local expiré le {expire_str}.{S}"
-                    except ValueError:
-                        return False, f"{R}Mode hors-ligne: Fichier d'authentification corrompu.{S}"
-        return False, f"{R}Mode hors-ligne: Aucune information d'abonnement local valide trouvée.{S}"
-
-def key():
-    auth_file = os.path.expanduser("~/.smmkingdom_auth")
-    
-    # Générer une clé unique pour cette tentative de paiement
-    av = "Pro"
-    ar = "JK"
-    centre = "".join(random.SystemRandom().choice("AZERTYUIOPQSDFGHJKLMWXCVBNabcdefghijklmnopqrstuvwxyz") for i in range(30))
-    apv = f"{av}{centre}{ar}"
-    os.system("clear")
-    
-    la = (f"{r}Vous n'êtes pas encore approuvé pour cet outil.{S}\n"
-          f"{B}[{V}≈{B}] {Bl}Votre clé: {o}{apv}\n"
-          f"{B}[{V}≈{B}]{Bl} Veuillez copier cette clé et l'utiliser sur le site de paiement.\n"
-          f"{B}[{V}≈{B}] {Bl}Site de paiement: {o}https://passportdl.pythonanywhere.com/\n")
-    
-    for lax in la:
-        print(lax, end='', flush=True)
-        time.sleep(0.05)
-    
-    time.sleep(2)
-    ouvrir_site_paiement()
-    
-    while True:
-        input(f"\n{J}Appuyez sur Entrée APRÈS avoir effectué le paiement pour vérifier...{S}")
-        success, message = verify_online_subscription(apv, auth_file)
-        print(message)
-        if success:
-            check_subscription() # Relance la vérification complète qui mènera au menu
-            break
-        else:
-            print(f"{J}Veuillez réessayer la vérification ou contacter le support si le problème persiste.{S}")
-
-def check_subscription():
-    auth_file = os.path.expanduser("~/.smmkingdom_auth")
-    key_to_check = None
-    
-    if os.path.exists(auth_file):
-        with open(auth_file, 'r') as f:
-            lines = f.read().splitlines()
-            if lines:
-                key_to_check = lines[0].strip()
-
-    if key_to_check:
-        success, message = verify_online_subscription(key_to_check, auth_file)
-        print(message)
-        
-        if success:
-            with open(auth_file, 'r') as f:
-                expire_str = f.read().splitlines()[1].strip()
-            expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
-            remaining_days = (expire_date - datetime.datetime.now()).days
-            print(f"{V}Il vous reste {remaining_days} jours d'abonnement.{S}")
-            time.sleep(3)
-            menu()
-            return
-
-    # Si la clé n'existe pas ou si la vérification (en ligne ou hors ligne) a échoué
-    print(f"{R}Aucun abonnement valide trouvé.{S}")
-    time.sleep(2)
-    key()
-    return
-
-def ouvrir_site_paiement():
-    url = "https://passportdl.pythonanywhere.com"
-    print(f"{Bl}Ouverture du site de paiement: {o}{url}{S}")
-    try:
-        if sys.platform.startswith('linux'):
-            # Pour Termux, `xdg-open` peut ne pas être disponible, utiliser `am start`
-            if "com.termux" in os.environ.get("PREFIX", ""):
-                os.system(f"am start -a android.intent.action.VIEW -d {url}")
-            else:
-                os.system(f"xdg-open {url}")
-        elif sys.platform.startswith('win'):
-            os.startfile(url)
-        elif sys.platform.startswith('darwin'):
-            os.system(f"open {url}")
-        else:
-            print(f"Veuillez ouvrir ce lien dans votre navigateur : {url}")
-    except Exception as e:
-        print(f"{R}Impossible d'ouvrir le navigateur automatiquement. Erreur : {e}{S}")
-        print(f"Veuillez ouvrir ce lien manuellement : {url}")
-
-def update_bot():
-    clear()
-    print(f"{o}--- Mise à jour du Bot ---{S}")
-    try:
-        print(f"{Bl}Téléchargement de la dernière version...{S}")
-        url = "https://raw.githubusercontent.com/TRACKbest/nui/main/smm.py"
-        response = requests.get(url)
-        response.raise_for_status() # Lève une exception si le téléchargement échoue
-        
-        with open(__file__, 'w', encoding='utf-8') as f:
-            f.write(response.text)
-            
-        print(f"{V}Mise à jour réussie ! Le script va redémarrer.{S}")
-        time.sleep(3)
-        # Redémarre le script
-        os.execv(sys.executable, ['python'] + sys.argv)
-    except requests.exceptions.RequestException as e:
-        print(f"{R}Erreur lors du téléchargement de la mise à jour: {e}{S}")
-        print(f"{J}Veuillez réessayer plus tard ou mettre à jour manuellement depuis GitHub.{S}")
-        time.sleep(5)
-        menu()
-    except Exception as e:
-        print(f"{R}Une erreur est survenue lors de la mise à jour: {e}{S}")
-        time.sleep(5)
-        menu()
-
 def manage_insta_accounts():
     clear()
     path = os.path.join(BASE_DIR, "insta-acct.txt")
@@ -1235,7 +1114,7 @@ def attempt_login_and_get_cookie(user, pwd):
     }
     try:
         rq_session = requests.session()
-        rq1 = rq_session.post(url=url, headers=header0, data=data1, timeout=15)
+        rq1 = rq_session.post(url=url, headers=header0, data=data1)
         rp1 = rq1.text
         if "ok" in rp1 and "logged_in_user" in rp1:
             cookies = str(rq1.cookies.get_dict())[1:-1].replace("'", '').replace(':', '=').replace(',', ';')
@@ -1351,10 +1230,36 @@ def manage_on_hold_accounts():
         time.sleep(2)
         manage_on_hold_accounts()
 
+def update_bot():
+    clear()
+    print(f"{o}--- Mise à jour du Bot ---{S}")
+    try:
+        print(f"{Bl}Téléchargement de la dernière version...{S}")
+        url = "https://raw.githubusercontent.com/TRACKbest/nui/main/smm.py"
+        response = requests.get(url)
+        response.raise_for_status() # Lève une exception si le téléchargement échoue
+        
+        with open(__file__, 'w', encoding='utf-8') as f:
+            f.write(response.text)
+            
+        print(f"{V}Mise à jour réussie ! Le script va redémarrer.{S}")
+        time.sleep(3)
+        # Redémarre le script
+        os.execv(sys.executable, ['python'] + sys.argv)
+    except requests.exceptions.RequestException as e:
+        print(f"{R}Erreur lors du téléchargement de la mise à jour: {e}{S}")
+        print(f"{J}Veuillez réessayer plus tard ou mettre à jour manuellement depuis GitHub.{S}")
+        time.sleep(5)
+        menu()
+    except Exception as e:
+        print(f"{R}Une erreur est survenue lors de la mise à jour: {e}{S}")
+        time.sleep(5)
+        menu()
+
 if __name__ == "__main__":
     try:
         load_on_hold_accounts()
-        check_subscription()
+        menu()
     except KeyboardInterrupt:
         print(f"\n{R}Interruption détectée. Fermeture du script...{S}")
     finally:
