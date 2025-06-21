@@ -120,6 +120,7 @@ def menu():
   print(f"{o}[{V}5{o}] Gérer les comptes Instagram")
   print(f"{o}[{V}6{o}] Gérer les comptes en attente")
   print(f"{o}[{V}7{o}] Mettre à jour le Bot")
+  print(f"{o}[{V}8{o}] Payer mon abonnement")
   print(f"{o}[{V}0{o}] Quitter")
   print(f"{o}═════════════════════════════════════════")
   sel=input(f"{o}[{V}?{o}] Votre choix : {B}")
@@ -145,6 +146,8 @@ def menu():
     manage_on_hold_accounts()
   elif sel=="7":
     update_bot()
+  elif sel=="8":
+    open_payment_site()
   elif sel=="0":
     exit()
   else:
@@ -1255,6 +1258,28 @@ def update_bot():
         print(f"{R}Une erreur est survenue lors de la mise à jour: {e}{S}")
         time.sleep(5)
         menu()
+
+def open_payment_site():
+    url = APP_URL
+    print(f"{Bl}Ouverture du site de paiement: {o}{url}{S}")
+    try:
+        if sys.platform.startswith('linux'):
+            # Pour Termux, `xdg-open` peut ne pas être disponible, utiliser `am start`
+            if "com.termux" in os.environ.get("PREFIX", ""):
+                os.system(f"am start -a android.intent.action.VIEW -d {url}")
+            else:
+                os.system(f"xdg-open {url}")
+        elif sys.platform.startswith('win'):
+            os.startfile(url)
+        elif sys.platform.startswith('darwin'):
+            os.system(f"open {url}")
+        else:
+            print(f"Veuillez ouvrir ce lien dans votre navigateur : {url}")
+    except Exception as e:
+        print(f"{R}Impossible d'ouvrir le navigateur automatiquement. Erreur : {e}{S}")
+        print(f"Veuillez ouvrir ce lien manuellement : {url}")
+    input(f"\n{J}Appuyez sur Entrée pour revenir au menu...{S}")
+    menu()
 
 if __name__ == "__main__":
     try:
