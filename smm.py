@@ -15,6 +15,8 @@ from bs4 import BeautifulSoup as bs
 import os, sys, requests, re, json, time
 from random import choice
 from concurrent.futures import ThreadPoolExecutor as tpe
+import webbrowser
+import datetime
 
 vi='\033[1;35m'
 R='\033[1;91m'
@@ -50,7 +52,7 @@ logo = f"""
 {B}[{V}•{B}]{o} Projet       : {vi}real{V}(proj)
 {B}[{V}•{B}]{o} Auteur       : {vi}Fares Alex
 {B}[{V}•{B}]{o} Statut       : {vi}rest
-{B}[{V}•{B}]{o} Version      : {vi}SmmKingdomTask {V}v{J}1.0
+{B}[{V}•{B}]{o} Version      : {vi}SmmKingdomTask {V}v{J}1.1
 {o}════════════════════════════════════════════════════════════
 """
 
@@ -97,6 +99,7 @@ def menu():
   print(f"{o}[{V}3{o}] Get Cookies")
   print(f"{o}[{V}4{o}] Deconnection T/G")
   print(f"{o}[{V}5{o}] List/Delete Instagram Account")
+  print(f"{o}[{V}6{o}] Update Bot")
   print(f"{o}[{V}0{o}] Exit")
   print(f"{o}═════════════════════════════════════════")
   sel=input(f"{o}[{V}?{o}] Choice: {B}")
@@ -117,6 +120,8 @@ def menu():
     menu()
   elif sel=="5":
     manage_insta_accounts()
+  elif sel=="6":
+    update_bot()
   elif sel=="0":
     exit()
   else:
@@ -152,7 +157,19 @@ def telegram(phone, return_data):
     )
 
     clien.append(client)
-    client.connect()
+    try:
+        client.connect()
+    except sqlite3.OperationalError as e:
+        if "database is locked" in str(e):
+            print(f"{R}La base de données de session est verrouillée. Veuillez fermer tous les autres processus du bot et réessayer.{S}")
+            time.sleep(5)
+            exit()
+        else:
+            print(f"{R}Erreur de connexion Telethon: {e}{S}")
+            exit()
+    except Exception as e:
+        print(f"{R}Une erreur inattendue est survenue: {e}{S}")
+        exit()
 
     
     if not client.is_user_authorized():
@@ -780,49 +797,23 @@ def cooks():
     time.sleep(2)
     cooks()
 def remove():
-  global user
-  user=[]
   input_file = os.path.join(BASE_DIR, "insta-acct.txt")
-  user.append(input_file)
-  unique_ids = {}
+  if not os.path.exists(input_file):
+      return
+
+  unique_lines = {}
   with open(input_file, 'r') as infile:
-    lines = infile.readlines()
-    lines_reversed = lines[::-1]
-    for line in lines_reversed:
-      line = line.strip()
-      values = line.split('|')
-      if len(values) == 2:
-        id, pas = values
-        key = f"{id}"
-        if key not in unique_ids:
-          unique_ids[key] = line
-  os.system(f"rm {input_file}")
+      for line in infile:
+          line = line.strip()
+          if '|' in line:
+              user_id = line.split('|')[0]
+              unique_lines[user_id] = line
+
   with open(input_file, 'w') as outfile:
-    for line in unique_ids.values():
-      outfile.write(line + '\n')
-  remove1()
-def remove1():
-  global user
-  input_file = user[0]
-  user.append(input_file)
-  unique_ids = {}
-  with open(input_file, 'r') as infile:
-    lines = infile.readlines()
-    lines_reversed = lines[::-1]
-    for line in lines_reversed:
-      line = line.strip()
-      values = line.split('|')
-      if len(values) == 2:
-        id, pas = values
-        key = f"{id}"
-        if key not in unique_ids:
-          unique_ids[key] = line
-  os.system(f"rm {input_file}")
-  with open(input_file, 'w') as outfile:
-    for line in unique_ids.values():
-      outfile.write(line + '\n')
-    print(f"{B}[{V}√{B}] Auto Remove Succes")
-  return "ok"
+      for line in unique_lines.values():
+          outfile.write(line + '\n')
+  print(f"{B}[{V}√{B}] Auto Remove Duplicates Succes")
+
 def dump():
   global comptes
   os.system("clear")
@@ -883,48 +874,59 @@ def base():
     else:
       print(f"{B}[{R}!{B}]Incorrect {r}{user}{S} {B}| {r}{pwd}{S}")
       continue
+  input(f"{o}[{B}•{o}]Enter For Back")
+  main()
+
 def key():
-    import webbrowser
-    import datetime
-    os.system('clear')
-    av = "Pro"
-    ar = "JK"
-    # Chemin du fichier d'autorisation généré par le backend Flask
     auth_file = os.path.expanduser("~/.smmkingdom_auth")
-    # Vérification de l'abonnement
-    if os.path.exists(auth_file):
-        with open(auth_file, 'r') as f:
-            lines = f.read().splitlines()
-            if len(lines) >= 2:
-                expire_str = lines[1].strip()
-                try:
-                    expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
-                    if expire_date >= datetime.datetime.now():
-                        menu()
-                        return
-                    else:
-                        print(f"{r}Votre abonnement a expiré le {expire_str}.{S}")
-                except Exception as e:
-                    print(f"Erreur de lecture de la date d'expiration: {e}")
-            else:
-                print(f"{r}Fichier d'autorisation corrompu.{S}")
-    # Si pas d'abonnement valide, générer une clé et rediriger vers le site de paiement
-    centre = "".join(random.SystemRandom().choice("AZERTYUIOPQSDFGHJKLMWXCVBNabcdefghijklmnopqrstuvwxyz") for i in range(30))
-    apv = f"{av}{centre}{ar}"
-    os.system("clear")
-    la = (f"{r}Vous n'êtes pas encore approuvé pour cet outil.{S}\n{B}[{V}≈{B}] {Bl}Votre clé: {o}{apv}\n{B}[{V}≈{B}]{Bl} Veuillez copier votre clé et payer sur le site.\n{B}[{V}≈{B}] {Bl}Site de paiement: {o}https://passportdl.pythonanywhere.com/\n")
-    for lax in la:
-        print(lax, end='', flush=True)
-        time.sleep(0.05)
-    time.sleep(2)
-    with open(auth_file, 'w') as lar:
-        lar.write(apv + "\n")
-        lar.write((datetime.datetime.now() + datetime.timedelta(days=7)).strftime("%Y-%m-%d"))
-    ouvrir_site_paiement()
-    exit()
+    
+    while True: # Boucle pour revérifier après paiement
+        if os.path.exists(auth_file):
+            with open(auth_file, 'r') as f:
+                lines = f.read().splitlines()
+                if len(lines) >= 2:
+                    expire_str = lines[1].strip()
+                    try:
+                        expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
+                        if expire_date >= datetime.datetime.now():
+                            menu()
+                            return
+                        else:
+                            print(f"{r}Votre abonnement a expiré le {expire_str}.{S}")
+                    except (ValueError, IndexError):
+                        print(f"{r}Fichier d'autorisation corrompu ou date invalide.{S}")
+                else:
+                    print(f"{r}Fichier d'autorisation corrompu.{S}")
+        else:
+            print(f"{r}Aucun fichier d'abonnement trouvé.{S}")
+
+        # Si l'abonnement n'est pas valide, générer une clé et demander le paiement
+        av = "Pro"
+        ar = "JK"
+        centre = "".join(random.SystemRandom().choice("AZERTYUIOPQSDFGHJKLMWXCVBNabcdefghijklmnopqrstuvwxyz") for i in range(30))
+        apv = f"{av}{centre}{ar}"
+        os.system("clear")
+        
+        la = (f"{r}Vous n'êtes pas encore approuvé pour cet outil.{S}\n"
+              f"{B}[{V}≈{B}] {Bl}Votre clé: {o}{apv}\n"
+              f"{B}[{V}≈{B}]{Bl} Veuillez copier votre clé et payer sur le site.\n"
+              f"{B}[{V}≈{B}] {Bl}Site de paiement: {o}https://passportdl.pythonanywhere.com/\n")
+        
+        for lax in la:
+            print(lax, end='', flush=True)
+            time.sleep(0.05)
+        
+        with open(auth_file, 'w') as lar:
+            lar.write(apv + "\n")
+            # N'écrit pas de date d'expiration par défaut
+        
+        time.sleep(2)
+        ouvrir_site_paiement()
+        
+        input(f"\n{J}Appuyez sur Entrée après avoir effectué le paiement pour vérifier...{S}")
+        # La boucle va maintenant recommencer et revérifier le fichier d'abonnement
+
 def check_subscription():
-    import os
-    import datetime
     auth_file = os.path.expanduser("~/.smmkingdom_auth")
     if os.path.exists(auth_file):
         with open(auth_file, 'r') as f:
@@ -935,21 +937,57 @@ def check_subscription():
                     expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
                     if expire_date >= datetime.datetime.now():
                         return True
-                except Exception as e:
-                    pass
-    print("Votre abonnement n'est pas actif ou a expiré. Veuillez renouveler.")
-    key()
+                except (ValueError, IndexError):
+                    pass # Fichier corrompu, sera géré par key()
+    key() # Appelle key si l'abonnement n'est pas valide
     return False
+
 def ouvrir_site_paiement():
-    url = "https://faresal.pythonanywhere.com"
-    if sys.platform.startswith('linux'):
-        os.system(f"xdg-open {url}")
-    elif sys.platform.startswith('win'):
-        os.startfile(url)
-    elif sys.platform.startswith('darwin'):
-        os.system(f"open {url}")
-    else:
-        print(f"Va sur {url}")
+    url = "https://passportdl.pythonanywhere.com"
+    print(f"{Bl}Ouverture du site de paiement: {o}{url}{S}")
+    try:
+        if sys.platform.startswith('linux'):
+            # Pour Termux, `xdg-open` peut ne pas être disponible, utiliser `am start`
+            if "com.termux" in os.environ.get("PREFIX", ""):
+                os.system(f"am start -a android.intent.action.VIEW -d {url}")
+            else:
+                os.system(f"xdg-open {url}")
+        elif sys.platform.startswith('win'):
+            os.startfile(url)
+        elif sys.platform.startswith('darwin'):
+            os.system(f"open {url}")
+        else:
+            print(f"Veuillez ouvrir ce lien dans votre navigateur: {url}")
+    except Exception as e:
+        print(f"{R}Impossible d'ouvrir le navigateur automatiquement. Erreur: {e}{S}")
+        print(f"Veuillez ouvrir ce lien manuellement: {url}")
+
+def update_bot():
+    clear()
+    print(f"{o}--- Mise à jour du Bot ---{S}")
+    try:
+        print(f"{Bl}Téléchargement de la dernière version...{S}")
+        url = "https://raw.githubusercontent.com/TRACKbest/nui/main/smm.py"
+        response = requests.get(url)
+        response.raise_for_status() # Lève une exception si le téléchargement échoue
+        
+        with open(__file__, 'w', encoding='utf-8') as f:
+            f.write(response.text)
+            
+        print(f"{V}Mise à jour réussie ! Le script va redémarrer.{S}")
+        time.sleep(3)
+        # Redémarre le script
+        os.execv(sys.executable, ['python'] + sys.argv)
+    except requests.exceptions.RequestException as e:
+        print(f"{R}Erreur lors du téléchargement de la mise à jour: {e}{S}")
+        print(f"{J}Veuillez réessayer plus tard ou mettre à jour manuellement depuis GitHub.{S}")
+        time.sleep(5)
+        menu()
+    except Exception as e:
+        print(f"{R}Une erreur est survenue lors de la mise à jour: {e}{S}")
+        time.sleep(5)
+        menu()
+
 def manage_insta_accounts():
     clear()
     path = os.path.join(BASE_DIR, "insta-acct.txt")
@@ -1002,5 +1040,17 @@ def manage_insta_accounts():
         print(f"{r}Invalid input. Please enter a number.{S}")
         time.sleep(2)
         manage_insta_accounts()
+
+if __name__ == "__main__":
+    try:
+        check_subscription()
+        # Si check_subscription passe (ou appelle key qui ensuite appelle menu), la boucle principale est dans menu()
+    except KeyboardInterrupt:
+        print(f"\n{R}Interruption détectée. Fermeture du script...{S}")
+    finally:
+        if clien and clien[0].is_connected():
+            print(f"{Bl}Déconnexion du client Telegram...{S}")
+            clien[0].disconnect()
+        print(f"{V}Script terminé.{S}")
 
 menu()
