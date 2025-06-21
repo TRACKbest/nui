@@ -68,7 +68,7 @@ accounts_with_no_tasks = []
 rq=requests.session()
 session = "sessions"
 BASE_DIR = os.path.join(os.path.dirname(__file__), "SmmKingdomTask")
-APP_URL = "https://faresalex.pythonanywhere.com"
+APP_URL = "https://faresal.pythonanywhere.com"
 if not os.path.exists(BASE_DIR):
     os.makedirs(BASE_DIR)
 ON_HOLD_FILE = os.path.join(BASE_DIR, "on_hold_accounts.txt")
