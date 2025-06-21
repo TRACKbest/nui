@@ -987,7 +987,12 @@ def base():
   main()
 
 def verify_online_subscription(key_to_check, auth_file):
-    """Vérifie la clé d'abonnement en ligne et met à jour le fichier local."""
+    """
+    Vérifie la clé d'abonnement en ligne.
+    En cas de succès, met à jour le fichier local avec la date d'expiration du serveur.
+    En cas d'échec de connexion, se rabat sur la vérification du fichier local.
+    Retourne (True, "message") en cas de succès, (False, "message") en cas d'échec.
+    """
     api_url = f"https://passportdl.pythonanywhere.com/api/check_status?key={key_to_check}"
     print(f"{Bl}Vérification de l'abonnement en ligne...{S}")
     try:
@@ -999,20 +1004,34 @@ def verify_online_subscription(key_to_check, auth_file):
                 with open(auth_file, 'w') as f:
                     f.write(key_to_check + "\n")
                     f.write(expire_str + "\n")
-                print(f"{V}Abonnement activé avec succès ! Expire le : {expire_str}{S}")
-                time.sleep(3)
-                return True
+                return True, f"{V}Abonnement vérifié en ligne. Expire le : {expire_str}{S}"
             else:
-                print(f"{R}La clé n'est pas valide ou l'abonnement est inactif.{S}")
-                print(f"{J}Message du serveur : {data.get('message', 'Aucun message')}{S}")
-                time.sleep(3)
-                return False
+                msg = data.get('message', 'Aucun message')
+                if os.path.exists(auth_file):
+                    os.remove(auth_file)
+                return False, f"{R}La clé n'est pas valide ou l'abonnement est inactif. Message: {msg}{S}"
         else:
-            print(f"{R}Erreur du serveur de vérification (Code: {response.status_code}).{S}")
-            return False
+            return False, f"{R}Erreur du serveur de vérification (Code: {response.status_code}). Tentative de vérification locale.{S}"
+
     except requests.exceptions.RequestException as e:
         print(f"{R}Impossible de contacter le serveur de vérification : {e}{S}")
-        return False
+        print(f"{J}Vérification de l'abonnement local comme alternative...{S}")
+        if os.path.exists(auth_file):
+            with open(auth_file, 'r') as f:
+                lines = f.read().splitlines()
+            if len(lines) >= 2:
+                local_key, expire_str = lines[0].strip(), lines[1].strip()
+                if local_key == key_to_check:
+                    try:
+                        expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
+                        if expire_date >= datetime.datetime.now():
+                            remaining_days = (expire_date - datetime.datetime.now()).days
+                            return True, f"{V}Mode hors-ligne: Abonnement local valide. {remaining_days} jours restants.{S}"
+                        else:
+                            return False, f"{R}Mode hors-ligne: Abonnement local expiré le {expire_str}.{S}"
+                    except ValueError:
+                        return False, f"{R}Mode hors-ligne: Fichier d'authentification corrompu.{S}"
+        return False, f"{R}Mode hors-ligne: Aucune information d'abonnement local valide trouvée.{S}"
 
 def key():
     auth_file = os.path.expanduser("~/.smmkingdom_auth")
@@ -1038,32 +1057,41 @@ def key():
     
     while True:
         input(f"\n{J}Appuyez sur Entrée APRÈS avoir effectué le paiement pour vérifier...{S}")
-        if verify_online_subscription(apv, auth_file):
-            menu() # L'abonnement est actif, on lance le menu
+        success, message = verify_online_subscription(apv, auth_file)
+        print(message)
+        if success:
+            check_subscription() # Relance la vérification complète qui mènera au menu
             break
         else:
             print(f"{J}Veuillez réessayer la vérification ou contacter le support si le problème persiste.{S}")
 
 def check_subscription():
     auth_file = os.path.expanduser("~/.smmkingdom_auth")
+    key_to_check = None
+    
     if os.path.exists(auth_file):
         with open(auth_file, 'r') as f:
             lines = f.read().splitlines()
-            if len(lines) >= 2:
-                key, expire_str = lines[0].strip(), lines[1].strip()
-                try:
-                    expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
-                    if expire_date >= datetime.datetime.now():
-                        print(f"{V}Abonnement local valide trouvé. Expire le: {expire_str}{S}")
-                        time.sleep(2)
-                        menu()
-                        return
-                    else:
-                        print(f"{r}Votre abonnement local a expiré le {expire_str}.{S}")
-                except (ValueError, IndexError):
-                    pass # Fichier corrompu, on continue pour appeler key()
-    
-    # Si aucun abonnement local valide n'est trouvé, on lance le processus de clé
+            if lines:
+                key_to_check = lines[0].strip()
+
+    if key_to_check:
+        success, message = verify_online_subscription(key_to_check, auth_file)
+        print(message)
+        
+        if success:
+            with open(auth_file, 'r') as f:
+                expire_str = f.read().splitlines()[1].strip()
+            expire_date = datetime.datetime.strptime(expire_str, "%Y-%m-%d")
+            remaining_days = (expire_date - datetime.datetime.now()).days
+            print(f"{V}Il vous reste {remaining_days} jours d'abonnement.{S}")
+            time.sleep(3)
+            menu()
+            return
+
+    # Si la clé n'existe pas ou si la vérification (en ligne ou hors ligne) a échoué
+    print(f"{R}Aucun abonnement valide trouvé.{S}")
+    time.sleep(2)
     key()
     return
 
