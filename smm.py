@@ -479,19 +479,20 @@ def account():
         print(f"{o}[{B}•{o}] Nom d'utilisateur : {v}{user}{S}")
         mss=message()
         if "Sorry" in mss:
-          print(f"{J}[!] 'Sorry' reçu. Aucune tâche pour {user} pour le moment.{S}")
-          if user not in accounts_with_no_tasks:
-            accounts_with_no_tasks.append(user)
-            save_on_hold_accounts()
-            print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
           
-            time.sleep(2)
             return None
         elif "▪️ Action :" in mss:
           task(cooks,user)
           continue
         elif "🟡 Account" in mss:
           print(f"{co}{mss}{S}")
+          print(f"{J}[!] '🟡 Account' reçu. Aucune tâche pour {user} pour le moment.{S}")
+          if user not in accounts_with_no_tasks:
+            accounts_with_no_tasks.append(user)
+            save_on_hold_accounts()
+            print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
+          
+           
          
           time.sleep(2)
           # On tente de renouveler le cookie pour ce compte
