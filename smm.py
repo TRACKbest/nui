@@ -556,7 +556,6 @@ def task(user):
     try:
         time.sleep(2)
         channel_entity = client.get_entity("@SmmKingdomTasksBot")
-        channel_username = "@SmmKingdomTasksBot"
         mss = message()
         if "▪️ Action :" in mss:
             action_type = None
@@ -600,12 +599,10 @@ def task(user):
                     save_daily_state(daily_state)
                     client.send_message(entity=channel_entity, message="✅Completed")
                     human_delay()
-                    task(user)
                 except Exception as e:
                     print(f"{vi}[{R}x{vi}] {R}Échec du Like: {e}{S}")
                     client.send_message(entity=channel_entity, message="✅Completed")
                     human_delay()
-                    task(user)
             elif action_type == 'follow':
                 link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(mss)).group(1)
                 print(f"{vi}Lien utilisateur : {B}{link}")
@@ -621,12 +618,10 @@ def task(user):
                     save_daily_state(daily_state)
                     client.send_message(entity=channel_entity, message="✅Completed")
                     human_delay()
-                    task(user)
                 except Exception as e:
                     print(f"{vi}[{R}x{vi}] {R}Échec du Follow: {e}{S}")
                     client.send_message(entity=channel_entity, message="✅Completed")
                     human_delay()
-                    task(user)
             elif action_type == 'comment':
                 link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(mss)).group(1)
                 print(f"{vi}Lien du commentaire : {B}{link}")
@@ -645,17 +640,15 @@ def task(user):
                     save_daily_state(daily_state)
                     client.send_message(entity=channel_entity, message="✅Completed")
                     human_delay()
-                    task(user)
                 except Exception as e:
                     print(f"{vi}[{R}x{vi}] {R}Échec du commentaire: {e}{S}")
                     if "KeyError: 'data'" in str(e) or "no longer available" in str(e):
                         print(f"{R}Le post n'est plus disponible ou le lien est invalide.{S}")
                     client.send_message(entity=channel_entity, message="✅Completed")
                     human_delay()
-                    task(user)
         elif "Sorry" in mss:
             print(f"{J}[!] 'Sorry' reçu. Aucune tâche pour {user} pour le moment.{S}")
-            return None
+            return
         elif "🟡 Account" in mss:
             print(f"{co}{mss}{S}")
             if user not in accounts_with_no_tasks:
@@ -663,57 +656,11 @@ def task(user):
                 save_on_hold_accounts()
                 print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
             time.sleep(2)
-            return None
+            return
         else:
-            if "Completed" in mss:
-                i = 0
-                while True:
-                    i += 1
-                    if message() in "✅Completed":
-                        if i <= 15:
-                            sys.stdout.write(f"\r✅Completed {i}s\r")
-                            sys.stdout.flush()
-                            time.sleep(0.1)
-                        else:
-                            client.send_message(entity=channel_entity, message="✅Completed")
-                            task(user)
-                    else:
-                        break
-                task(user)
-            elif user in mss:
-                a = 0
-                while True:
-                    a += 1
-                    if message() in user:
-                        if a <= 15:
-                            sys.stdout.write(f"\r{user} {a}s\r")
-                            sys.stdout.flush()
-                            time.sleep(0.1)
-                        else:
-                            client.send_message(entity=channel_entity, message=f"{user}")
-                            task(user)
-                    else:
-                        break
-                task(user)
-            else:
-                cmt = coms1()
-                link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(cmt)).group(1)
-                print(f"{vi}Lien du commentaire : {B}{link}")
-                print(f"{J}{mss}")
-                try:
-                    cl = ig_connect(user)
-                    media_id = cl.media_pk_from_url(link)
-                    cl.media_comment(media_id, mss)
-                    print(f"{vi}[{V}√{vi}] {V}Commentaire réussi{S}")
-                    client.send_message(entity=channel_entity, message="✅Completed")
-                    task(user)
-                except Exception as e:
-                    print(f"{vi}[{R}x{vi}] {R}Échec du commentaire: {e}{S}")
-                    client.send_message(entity=channel_entity, message="✅Completed")
-                    task(user)
+            print(f"{J}[!] Message inattendu : {mss}{S}")
     except Exception as e:
         print(f"{R}Erreur dans la tâche : {e}{S}")
-        task(user)
 
 def reactivate_accounts():
     on_hold_action = load_on_hold_action()
