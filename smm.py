@@ -178,6 +178,7 @@ def menu():
     print(f"{o}[{V}4{o}] Déconnexion Telegram")
     print(f"{o}[{V}6{o}] Ajouter un compte Instagram par identifiants")
     print(f"{o}[{V}7{o}] Mettre à jour le Bot")
+    print(f"{o}[{V}8{o}] Supprimer un compte Instagram")
     print(f"{o}[{V}0{o}] Quitter")
     print(f"{o}═════════════════════════════════════════")
     sel = input(f"{o}[{V}?{o}] Votre choix : {B}")
@@ -198,6 +199,8 @@ def menu():
         add_account_by_login()
     elif sel == "7":
         update_bot()
+    elif sel == "8":
+        delete_instagram_account()
     elif sel == "0":
         exit()
     else:
@@ -817,6 +820,46 @@ def add_account_by_login():
     except Exception as e:
         print(f"{R}[-] Connexion échouée : {e}{S}")
         time.sleep(3)
+    menu()
+
+def delete_instagram_account():
+    clear()
+    print(f"{o}--- Supprimer un compte Instagram ---{S}")
+    accounts_path = os.path.join(BASE_DIR, "insta-acct.txt")
+    if not os.path.exists(accounts_path):
+        print(f"{R}Aucun compte à supprimer.{S}")
+        time.sleep(2)
+        menu()
+        return
+    with open(accounts_path, 'r') as f:
+        accounts = [line.strip() for line in f if line.strip()]
+    if not accounts:
+        print(f"{R}Aucun compte à supprimer.{S}")
+        time.sleep(2)
+        menu()
+        return
+    print(f"{B}Comptes Instagram enregistrés :{S}")
+    for idx, acc in enumerate(accounts, 1):
+        print(f"{J}[{idx}] {acc}{S}")
+    try:
+        choice = int(input(f"{o}Numéro du compte à supprimer : {vi}"))
+        if 1 <= choice <= len(accounts):
+            user_to_delete = accounts[choice - 1]
+            # Supprimer du fichier insta-acct.txt
+            with open(accounts_path, 'w') as f:
+                for acc in accounts:
+                    if acc != user_to_delete:
+                        f.write(acc + '\n')
+            # Supprimer la session JSON
+            session_file = os.path.join(IG_SESSION_DIR, f"{user_to_delete}.json")
+            if os.path.exists(session_file):
+                os.remove(session_file)
+            print(f"{V}Compte {user_to_delete} supprimé avec succès.{S}")
+        else:
+            print(f"{R}Choix invalide.{S}")
+    except Exception as e:
+        print(f"{R}Erreur : {e}{S}")
+    time.sleep(2)
     menu()
 
 if __name__ == "__main__":
