@@ -464,6 +464,19 @@ def account():
             for user in all_accounts:
                 if user in accounts_with_no_tasks:
                     continue
+                # Vérifier si le user a atteint ses limites avant de tenter quoi que ce soit
+                action_state = load_action_state()
+                daily_state = load_daily_state()
+                today = datetime.now().strftime('%Y-%m-%d')
+                if user in daily_state and daily_state[user].get('date') == today:
+                    blocked = all(daily_state[user][a] >= DAILY_LIMITS[a] for a in ACTION_TYPES)
+                    if blocked:
+                        print(f"{J}[!] {user} a atteint ses limites journalières, passage au suivant.{S}")
+                        if user not in accounts_with_no_tasks:
+                            accounts_with_no_tasks.append(user)
+                            save_on_hold_accounts()
+                        continue
+                # Fin vérification limites
                 try:
                     cl = ig_connect(user)
                     # Test de connexion (récupération du profil)
@@ -493,7 +506,7 @@ def account():
                 print(f"{o}[{B}•{o}] Nom d'utilisateur : {v}{user}{S}")
                 mss = message()
                 if "Sorry" in mss:
-                    return None
+                    continue
                 elif "▪️ Action :" in mss:
                     task(user)
                     continue
@@ -562,10 +575,13 @@ def task(user):
                         on_hold_action[action_type] = [e for e in on_hold_action[action_type] if e['user'] != user]
                         save_on_hold_action(on_hold_action)
             if daily_state[user][action_type] >= DAILY_LIMITS[action_type]:
-                print(f"{R}Limite journalière atteinte pour {user} ({action_type}). Mise en attente jusqu'à demain.{S}")
+                print(f"{R}Limite journalière atteinte pour {user} ({action_type}). Passage au suivant.{S}")
+                if user not in accounts_with_no_tasks:
+                    accounts_with_no_tasks.append(user)
+                    save_on_hold_accounts()
                 return
             if action_state[user][action_type]['count'] >= ACTION_LIMITS[action_type]:
-                print(f"{J}Limite horaire atteinte pour {user} ({action_type}). Mise en attente 1h.{S}")
+                print(f"{J}Limite horaire atteinte pour {user} ({action_type}). Passage au suivant.{S}")
                 on_hold_action[action_type].append({'user': user, 'hold_time': time.time()})
                 save_on_hold_action(on_hold_action)
                 return
