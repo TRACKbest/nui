@@ -93,7 +93,7 @@ TRIAL_DURATION_HOURS = 5
 
 # Utilitaire pour délai humain
 
-def human_delay(min_sec=3, max_sec=6):
+def human_delay(min_sec=1, max_sec=3):
     delay = random.uniform(min_sec, max_sec)
     print(f"{J}[!] Pause de {delay:.1f} secondes pour simuler un comportement humain...{S}")
     time.sleep(delay)
@@ -592,7 +592,8 @@ def task(user):
                 print(f"{vi}Lien utilisateur : {B}{link}")
                 human_delay()
                 try:
-                    user_id = cl.user_id_from_username(link.split('/')[-2]) if '/users/' in link else cl.user_id_from_username(link.split('/')[-1])
+                    username = link.rstrip('/').split('/')[-1]
+                    user_id = cl.user_id_from_username(username)
                     cl.user_follow(user_id)
                     print(f"{vi}[{V}√{vi}] {V}Follow réussi{S}")
                     action_state[user]['follow']['count'] += 1
@@ -628,6 +629,8 @@ def task(user):
                     task(user)
                 except Exception as e:
                     print(f"{vi}[{R}x{vi}] {R}Échec du commentaire: {e}{S}")
+                    if "KeyError: 'data'" in str(e) or "no longer available" in str(e):
+                        print(f"{R}Le post n'est plus disponible ou le lien est invalide.{S}")
                     client.send_message(entity=channel_entity, message="✅Completed")
                     human_delay()
                     task(user)
