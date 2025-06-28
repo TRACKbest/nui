@@ -78,14 +78,16 @@ ON_HOLD_FILE = os.path.join(BASE_DIR, "on_hold_accounts.txt")
 ACTION_LIMITS = {
     'follow': 10,
     'like': 40,
-    'comment': 10
+    'comment': 10,
+    'story': 20
 }
 DAILY_LIMITS = {
     'follow': 200,
     'like': 500,
-    'comment': 200
+    'comment': 200,
+    'story': 300
 }
-ACTION_TYPES = ['follow', 'like', 'comment']
+ACTION_TYPES = ['follow', 'like', 'comment', 'story']
 ACTION_STATE_FILE = os.path.join(BASE_DIR, 'action_state.json')
 DAILY_STATE_FILE = os.path.join(BASE_DIR, 'daily_state.json')
 ON_HOLD_ACTION_FILE = os.path.join(BASE_DIR, 'on_hold_action.json')
@@ -532,20 +534,58 @@ def account():
             menu()
 
 def task(user):
+    """
+    Gère l'exécution des tâches Instagram pour un utilisateur donné.
+    """
     global clien, var1, accounts_with_no_tasks
     client = clien[0]
+    
+    # Initialisation et vérifications
+    if not _initialize_task_state(user):
+        return None
+    
+    try:
+        time.sleep(2)
+        channel_entity = client.get_entity("@SmmKingdomTasksBot")
+        mss = message()
+        
+        # Traitement des différents types de messages
+        if "▪️ Action :" in mss:
+            return _handle_action_task(user, mss, client, channel_entity)
+        elif "Sorry" in mss:
+            return _handle_sorry_message(user)
+        elif "🟡 Account" in mss:
+            return _handle_yellow_account_message(user, mss)
+        else:
+            return _handle_other_messages(user, mss, client, channel_entity)
+            
+    except Exception as e:
+        print(f"{R}Erreur dans la tâche : {e}{S}")
+        task(user)
+
+def _initialize_task_state(user):
+    """
+    Initialise l'état des tâches pour l'utilisateur.
+    """
     reactivate_accounts()
     action_state = load_action_state()
     daily_state = load_daily_state()
     on_hold_action = load_on_hold_action()
     today = datetime.now().strftime('%Y-%m-%d')
+    
+    # Initialisation de l'état des actions
     if user not in action_state:
         action_state[user] = {a: {'count': 0, 'last_reset': time.time()} for a in ACTION_TYPES}
+    
+    # Initialisation de l'état journalier
     if user not in daily_state or daily_state[user].get('date') != today:
-        daily_state[user] = {'date': today, 'follow': 0, 'like': 0, 'comment': 0}
+        daily_state[user] = {'date': today, 'follow': 0, 'like': 0, 'comment': 0, 'story': 0}
+    
     save_action_state(action_state)
     save_daily_state(daily_state)
     save_on_hold_action(on_hold_action)
+    
+    # Vérification si tous les comptes sont bloqués
     accounts_path = os.path.join(BASE_DIR, "insta-acct.txt")
     if os.path.exists(accounts_path):
         with open(accounts_path, 'r') as f:
@@ -553,114 +593,285 @@ def task(user):
         if all_accounts_blocked(daily_state, all_accounts):
             print(f"{R}Tous les comptes ont atteint leur limite journalière. Arrêt du programme jusqu'à demain.{S}")
             exit()
-    try:
-        time.sleep(2)
-        channel_entity = client.get_entity("@SmmKingdomTasksBot")
-        mss = message()
-        if "▪️ Action :" in mss:
-            action_type = None
-            if "the post" in mss:
-                action_type = 'like'
-            elif "Follow" in mss:
-                action_type = 'follow'
-            elif "the comment" in mss:
-                action_type = 'comment'
-            for entry in on_hold_action.get(action_type, []):
-                if entry['user'] == user:
-                    if time.time() - entry['hold_time'] < 3600:
-                        print(f"{J}{user} est en attente pour {action_type} (limite horaire).{S}")
-                        return
-                    else:
-                        on_hold_action[action_type] = [e for e in on_hold_action[action_type] if e['user'] != user]
-                        save_on_hold_action(on_hold_action)
-            if daily_state[user][action_type] >= DAILY_LIMITS[action_type]:
-                print(f"{R}Limite journalière atteinte pour {user} ({action_type}). Passage au suivant.{S}")
-                if user not in accounts_with_no_tasks:
-                    accounts_with_no_tasks.append(user)
-                    save_on_hold_accounts()
-                return
-            if action_state[user][action_type]['count'] >= ACTION_LIMITS[action_type]:
-                print(f"{J}Limite horaire atteinte pour {user} ({action_type}). Passage au suivant.{S}")
-                on_hold_action[action_type].append({'user': user, 'hold_time': time.time()})
+    
+    return True
+
+def _handle_action_task(user, mss, client, channel_entity):
+    """
+    Gère les tâches d'action (like, follow, comment).
+    """
+    action_type = _determine_action_type(mss)
+    if not action_type:
+        return None
+    
+    # Vérification des limites
+    if not _check_action_limits(user, action_type):
+        return None
+    
+    # Exécution de la tâche
+    return _execute_action(user, action_type, mss, client, channel_entity)
+
+def _determine_action_type(mss):
+    """
+    Détermine le type d'action à partir du message.
+    """
+    if "the post" in mss:
+        return 'like'
+    elif "Follow" in mss:
+        return 'follow'
+    elif "the comment" in mss:
+        return 'comment'
+    elif "the story" in mss:
+        return 'story'
+    return None
+
+def _check_action_limits(user, action_type):
+    """
+    Vérifie les limites horaires et journalières pour l'action.
+    """
+    action_state = load_action_state()
+    daily_state = load_daily_state()
+    on_hold_action = load_on_hold_action()
+    
+    # Vérification de la limite horaire
+    for entry in on_hold_action.get(action_type, []):
+        if entry['user'] == user:
+            if time.time() - entry['hold_time'] < 3600:
+                print(f"{J}{user} est en attente pour {action_type} (limite horaire).{S}")
+                return False
+            else:
+                on_hold_action[action_type] = [e for e in on_hold_action[action_type] if e['user'] != user]
                 save_on_hold_action(on_hold_action)
-                return
-            cl = ig_connect(user)
-            if action_type == 'like':
-                link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(mss)).group(1)
-                print(f"{vi}Lien du post : {B}{link}")
-                human_delay()
-                try:
-                    media_id = cl.media_pk_from_url(link)
-                    cl.media_like(media_id)
-                    print(f"{vi}[{V}√{vi}] {V}Like réussi{S}")
-                    action_state[user]['like']['count'] += 1
-                    daily_state[user]['like'] += 1
-                    save_action_state(action_state)
-                    save_daily_state(daily_state)
-                    client.send_message(entity=channel_entity, message="✅Completed")
-                    human_delay()
-                except Exception as e:
-                    print(f"{vi}[{R}x{vi}] {R}Échec du Like: {e}{S}")
-                    client.send_message(entity=channel_entity, message="✅Completed")
-                    human_delay()
-            elif action_type == 'follow':
-                link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(mss)).group(1)
-                print(f"{vi}Lien utilisateur : {B}{link}")
-                human_delay()
-                try:
-                    username = link.rstrip('/').split('/')[-1]
-                    user_id = cl.user_id_from_username(username)
-                    cl.user_follow(user_id)
-                    print(f"{vi}[{V}√{vi}] {V}Follow réussi{S}")
-                    action_state[user]['follow']['count'] += 1
-                    daily_state[user]['follow'] += 1
-                    save_action_state(action_state)
-                    save_daily_state(daily_state)
-                    client.send_message(entity=channel_entity, message="✅Completed")
-                    human_delay()
-                except Exception as e:
-                    print(f"{vi}[{R}x{vi}] {R}Échec du Follow: {e}{S}")
-                    client.send_message(entity=channel_entity, message="✅Completed")
-                    human_delay()
-            elif action_type == 'comment':
-                link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(mss)).group(1)
-                print(f"{vi}Lien du commentaire : {B}{link}")
-                delay = random.randint(350, 400)
-                print(f"{J}Pause de {delay} secondes avant le commentaire pour {user}.{S}")
-                time.sleep(delay)
-                mss_comment = coms(user)
-                print(f"{J}{mss_comment}")
-                try:
-                    media_id = cl.media_pk_from_url(link)
-                    cl.media_comment(media_id, mss_comment)
-                    print(f"{vi}[{V}+{vi}] {V}Commentaire réussi{S}")
-                    action_state[user]['comment']['count'] += 1
-                    daily_state[user]['comment'] += 1
-                    save_action_state(action_state)
-                    save_daily_state(daily_state)
-                    client.send_message(entity=channel_entity, message="✅Completed")
-                    human_delay()
-                except Exception as e:
-                    print(f"{vi}[{R}x{vi}] {R}Échec du commentaire: {e}{S}")
-                    if "KeyError: 'data'" in str(e) or "no longer available" in str(e):
-                        print(f"{R}Le post n'est plus disponible ou le lien est invalide.{S}")
-                    client.send_message(entity=channel_entity, message="✅Completed")
-                    human_delay()
-        elif "Sorry" in mss:
-            print(f"{J}[!] 'Sorry' reçu. Aucune tâche pour {user} pour le moment.{S}")
-            return
-        elif "🟡 Account" in mss:
-            print(f"{co}{mss}{S}")
-            if user not in accounts_with_no_tasks:
-                accounts_with_no_tasks.append(user)
-                save_on_hold_accounts()
-                print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
-            time.sleep(2)
-            return
-        else:
-            print(f"{J}[!] Message inattendu : {mss}{S}")
+    
+    # Vérification de la limite journalière
+    if daily_state[user][action_type] >= DAILY_LIMITS[action_type]:
+        print(f"{R}Limite journalière atteinte pour {user} ({action_type}). Mise en attente jusqu'à demain.{S}")
+        return False
+    
+    # Vérification de la limite horaire
+    if action_state[user][action_type]['count'] >= ACTION_LIMITS[action_type]:
+        print(f"{J}Limite horaire atteinte pour {user} ({action_type}). Mise en attente 1h.{S}")
+        on_hold_action[action_type].append({'user': user, 'hold_time': time.time()})
+        save_on_hold_action(on_hold_action)
+        return False
+    
+    return True
+
+def _execute_action(user, action_type, mss, client, channel_entity):
+    """
+    Exécute l'action spécifiée.
+    """
+    link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(mss)).group(1)
+    
+    if action_type == 'like':
+        return _execute_like_action(user, link, client, channel_entity)
+    elif action_type == 'follow':
+        return _execute_follow_action(user, link, client, channel_entity)
+    elif action_type == 'comment':
+        return _execute_comment_action(user, link, client, channel_entity)
+    elif action_type == 'story':
+        return _execute_story_action(user, link, client, channel_entity)
+    
+    return None
+
+def _execute_like_action(user, link, client, channel_entity):
+    """
+    Exécute l'action de like.
+    """
+    print(f"{vi}Lien du post : {B}{link}")
+    human_delay()
+    
+    try:
+        cl = ig_connect(user)
+        media_id = cl.media_pk_from_url(link)
+        cl.media_like(media_id)
+        print(f"{vi}[{V}√{vi}] {V}Like réussi{S}")
+        _update_action_counters(user, 'like')
+        client.send_message(entity=channel_entity, message="✅Completed")
+        human_delay()
+        task(user)
     except Exception as e:
-        print(f"{R}Erreur dans la tâche : {e}{S}")
+        print(f"{vi}[{R}x{vi}] {R}Échec du Like: {e}{S}")
+        client.send_message(entity=channel_entity, message="✅Completed")
+        human_delay()
+        task(user)
+
+def _execute_follow_action(user, link, client, channel_entity):
+    """
+    Exécute l'action de follow.
+    """
+    print(f"{vi}Lien utilisateur : {B}{link}")
+    human_delay()
+    
+    try:
+        cl = ig_connect(user)
+        username = link.rstrip('/').split('/')[-1]
+        user_id = cl.user_id_from_username(username)
+        cl.user_follow(user_id)
+        print(f"{vi}[{V}√{vi}] {V}Follow réussi{S}")
+        _update_action_counters(user, 'follow')
+        client.send_message(entity=channel_entity, message="✅Completed")
+        human_delay()
+        task(user)
+    except Exception as e:
+        print(f"{vi}[{R}x{vi}] {R}Échec du Follow: {e}{S}")
+        client.send_message(entity=channel_entity, message="✅Completed")
+        human_delay()
+        task(user)
+
+def _execute_comment_action(user, link, client, channel_entity):
+    """
+    Exécute l'action de commentaire.
+    """
+    print(f"{vi}Lien du commentaire : {B}{link}")
+    delay = random.randint(350, 400)
+    print(f"{J}Pause de {delay} secondes avant le commentaire pour {user}.{S}")
+    time.sleep(delay)
+    
+    mss_comment = coms(user)
+    print(f"{J}{mss_comment}")
+    
+    try:
+        cl = ig_connect(user)
+        media_id = cl.media_pk_from_url(link)
+        cl.media_comment(media_id, mss_comment)
+        print(f"{vi}[{V}+{vi}] {V}Commentaire réussi{S}")
+        _update_action_counters(user, 'comment')
+        client.send_message(entity=channel_entity, message="✅Completed")
+        human_delay()
+        task(user)
+    except Exception as e:
+        print(f"{vi}[{R}x{vi}] {R}Échec du commentaire: {e}{S}")
+        if "KeyError: 'data'" in str(e) or "no longer available" in str(e):
+            print(f"{R}Le post n'est plus disponible ou le lien est invalide.{S}")
+        client.send_message(entity=channel_entity, message="✅Completed")
+        human_delay()
+        task(user)
+
+def _execute_story_action(user, link, client, channel_entity):
+    """
+    Exécute l'action de story (like sur story).
+    """
+    print(f"{vi}Lien du story : {B}{link}")
+    human_delay()
+    
+    try:
+        cl = ig_connect(user)
+        # Pour les stories, on utilise la même logique que les likes
+        media_id = cl.media_pk_from_url(link)
+        cl.media_like(media_id)  # Like sur le story
+        print(f"{vi}[{V}√{vi}] {V}Story like réussi{S}")
+        _update_action_counters(user, 'story')  # Utilise le compteur story
+        client.send_message(entity=channel_entity, message="✅Completed")
+        human_delay()
+        task(user)
+    except Exception as e:
+        print(f"{vi}[{R}x{vi}] {R}Échec du Story like: {e}{S}")
+        client.send_message(entity=channel_entity, message="✅Completed")
+        human_delay()
+        task(user)
+
+def _update_action_counters(user, action_type):
+    """
+    Met à jour les compteurs d'actions.
+    """
+    action_state = load_action_state()
+    daily_state = load_daily_state()
+    
+    action_state[user][action_type]['count'] += 1
+    daily_state[user][action_type] += 1
+    
+    save_action_state(action_state)
+    save_daily_state(daily_state)
+
+def _handle_sorry_message(user):
+    """
+    Gère le message "Sorry".
+    """
+    print(f"{J}[!] 'Sorry' reçu. Aucune tâche pour {user} pour le moment.{S}")
+    return None
+
+def _handle_yellow_account_message(user, mss):
+    """
+    Gère le message "🟡 Account".
+    """
+    print(f"{co}{mss}{S}")
+    if user not in accounts_with_no_tasks:
+        accounts_with_no_tasks.append(user)
+        save_on_hold_accounts()
+        print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
+    time.sleep(2)
+    return None
+
+def _handle_other_messages(user, mss, client, channel_entity):
+    """
+    Gère les autres types de messages.
+    """
+    if "Completed" in mss:
+        return _handle_completed_message(user, client, channel_entity)
+    elif user in mss:
+        return _handle_user_message(user, client, channel_entity)
+    else:
+        return _handle_comment_message(user, mss, client, channel_entity)
+
+def _handle_completed_message(user, client, channel_entity):
+    """
+    Gère les messages "Completed".
+    """
+    i = 0
+    while True:
+        i += 1
+        if message() in "✅Completed":
+            if i <= 15:
+                sys.stdout.write(f"\r✅Completed {i}s\r")
+                sys.stdout.flush()
+                time.sleep(0.1)
+            else:
+                client.send_message(entity=channel_entity, message="✅Completed")
+                task(user)
+        else:
+            break
+    task(user)
+
+def _handle_user_message(user, client, channel_entity):
+    """
+    Gère les messages contenant le nom d'utilisateur.
+    """
+    a = 0
+    while True:
+        a += 1
+        if message() in user:
+            if a <= 15:
+                sys.stdout.write(f"\r{user} {a}s\r")
+                sys.stdout.flush()
+                time.sleep(0.1)
+            else:
+                client.send_message(entity=channel_entity, message=f"{user}")
+                task(user)
+        else:
+            break
+    task(user)
+
+def _handle_comment_message(user, mss, client, channel_entity):
+    """
+    Gère les messages de commentaire.
+    """
+    cmt = coms1()
+    link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(cmt)).group(1)
+    print(f"{vi}Lien du commentaire : {B}{link}")
+    print(f"{J}{mss}")
+    
+    try:
+        cl = ig_connect(user)
+        media_id = cl.media_pk_from_url(link)
+        cl.media_comment(media_id, mss)
+        print(f"{vi}[{V}√{vi}] {V}Commentaire réussi{S}")
+        client.send_message(entity=channel_entity, message="✅Completed")
+        task(user)
+    except Exception as e:
+        print(f"{vi}[{R}x{vi}] {R}Échec du commentaire: {e}{S}")
+        client.send_message(entity=channel_entity, message="✅Completed")
+        task(user)
 
 def reactivate_accounts():
     on_hold_action = load_on_hold_action()
