@@ -447,91 +447,130 @@ def insta():
     elif "New post is required!" in message:
       return message
     else:
-      insta()
+      continue
+  return "Instagram"  # Retour par défaut pour éviter la récursion infinie
 def account():
     global clien
     client = clien[0]
     load_on_hold_accounts()
+    
     while True:
-        path = os.path.join(BASE_DIR, "insta-acct.txt")
-        if os.path.exists(path):
-            all_accounts = [line.strip() for line in open(path, 'r').readlines() if line.strip()]
-            active_accounts_exist = any(user not in accounts_with_no_tasks for user in all_accounts)
-            if not active_accounts_exist:
-                print(f"{J}Tous les comptes sont en attente ou le fichier est vide.{S}")
-                print(f"{J}Utilisez l'option 6 du menu pour réactiver des comptes.{S}")
-                time.sleep(4)
+        try:
+            path = os.path.join(BASE_DIR, "insta-acct.txt")
+            if os.path.exists(path):
+                all_accounts = [line.strip() for line in open(path, 'r').readlines() if line.strip()]
+                active_accounts_exist = any(user not in accounts_with_no_tasks for user in all_accounts)
+                
+                if not active_accounts_exist:
+                    print(f"{J}Tous les comptes sont en attente ou le fichier est vide.{S}")
+                    print(f"{J}Utilisez l'option 6 du menu pour réactiver des comptes.{S}")
+                    time.sleep(4)
+                    menu()
+                    return
+                
+                for user in all_accounts:
+                    if user in accounts_with_no_tasks:
+                        continue
+                    
+                    try:
+                        # Vérifier si le user a atteint ses limites avant de tenter quoi que ce soit
+                        action_state = load_action_state()
+                        daily_state = load_daily_state()
+                        today = datetime.now().strftime('%Y-%m-%d')
+                        
+                        if user in daily_state and daily_state[user].get('date') == today:
+                            blocked = all(daily_state[user][a] >= DAILY_LIMITS[a] for a in ACTION_TYPES)
+                            if blocked:
+                                print(f"{J}[!] {user} a atteint ses limites journalières, passage au suivant.{S}")
+                                if user not in accounts_with_no_tasks:
+                                    accounts_with_no_tasks.append(user)
+                                    save_on_hold_accounts()
+                                continue
+                        
+                        # Test de connexion Instagram
+                        try:
+                            cl = ig_connect(user)
+                            cl.account_info()
+                            sys.stdout.write(f"\r{B}[{V}√{B}] {user}\r")
+                            sys.stdout.flush()
+                        except Exception as e:
+                            print(f"{B}[{R}X{B}] {user}{S} {black}(Vérifiez ce compte: {e})")
+                            # Ajouter à la liste d'attente en cas d'erreur de connexion
+                            if user not in accounts_with_no_tasks:
+                                accounts_with_no_tasks.append(user)
+                                save_on_hold_accounts()
+                            continue
+                        
+                        # Communication avec le bot
+                        channel_entity = client.get_entity("@SmmKingdomTasksBot")
+                        client.send_message(entity=channel_entity, message=f"Instagram")
+                        
+                        # Attendre la réponse du bot
+                        loop = 0
+                        while True:
+                            loop += 1
+                            try:
+                                if insta() in "Instagram":
+                                    if loop <= 10:
+                                        sys.stdout.write(f"\rInstagram {loop}s\r")
+                                        sys.stdout.flush()
+                                        time.sleep(0.1)
+                                    else:
+                                        client.send_message(entity=channel_entity, message="Instagram")
+                                        break
+                                else:
+                                    break
+                            except Exception as e:
+                                print(f"{R}Erreur lors de l'attente de réponse du bot: {e}{S}")
+                                break
+                        
+                        client.send_message(entity=channel_entity, message=f"{user}")
+                        print(f"{o}[{B}•{o}] Nom d'utilisateur : {v}{user}{S}")
+                        
+                        # Traitement du message de réponse
+                        try:
+                            mss = message()
+                            if "Sorry" in mss:
+                                continue
+                            elif "▪️ Action :" in mss:
+                                task(user)
+                                continue
+                            elif "🟡 Account" in mss:
+                                print(f"{co}{mss}{S}")
+                                print(f"{J}[!] '🟡 Account' reçu. Aucune tâche pour {user} pour le moment.{S}")
+                                if user not in accounts_with_no_tasks:
+                                    accounts_with_no_tasks.append(user)
+                                    save_on_hold_accounts()
+                                    print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
+                                time.sleep(2)
+                                continue
+                            else:
+                                time.sleep(4)
+                                task(user)
+                                continue
+                        except Exception as e:
+                            print(f"{R}Erreur lors du traitement du message pour {user}: {e}{S}")
+                            continue
+                            
+                    except Exception as e:
+                        print(f"{R}Erreur générale pour {user}: {e}{S}")
+                        print(f"{J}Continuation avec le prochain utilisateur...{S}")
+                        continue
+                        
+            else:
+                os.system("clear")
+                u = (f"{r}Aucun fichier trouvé : SmmKingdomTask/insta-acct.txt\n{S}")
+                for ix in u:
+                    print(ix, end='', flush=True)
+                    time.sleep(0.1)
                 menu()
                 return
-            for user in all_accounts:
-                if user in accounts_with_no_tasks:
-                    continue
-                # Vérifier si le user a atteint ses limites avant de tenter quoi que ce soit
-                action_state = load_action_state()
-                daily_state = load_daily_state()
-                today = datetime.now().strftime('%Y-%m-%d')
-                if user in daily_state and daily_state[user].get('date') == today:
-                    blocked = all(daily_state[user][a] >= DAILY_LIMITS[a] for a in ACTION_TYPES)
-                    if blocked:
-                        print(f"{J}[!] {user} a atteint ses limites journalières, passage au suivant.{S}")
-                        if user not in accounts_with_no_tasks:
-                            accounts_with_no_tasks.append(user)
-                            save_on_hold_accounts()
-                        continue
-                # Fin vérification limites
-                try:
-                    cl = ig_connect(user)
-                    # Test de connexion (récupération du profil)
-                    cl.account_info()
-                    sys.stdout.write(f"\r{B}[{V}√{B}] {user}\r")
-                    sys.stdout.flush()
-                except Exception as e:
-                    print(f"{B}[{R}X{B}] {user}{S} {black}(Vérifiez ce compte: {e})")
-                    continue
-                channel_entity = client.get_entity("@SmmKingdomTasksBot")
-                channel_username = "@SmmKingdomTasksBot"
-                client.send_message(entity=channel_entity, message=f"Instagram")
-                loop = 0
-                while True:
-                    loop += 1
-                    if insta() in "Instagram":
-                        if loop <= 10:
-                            sys.stdout.write(f"\rInstagram {loop}s\r")
-                            sys.stdout.flush()
-                            time.sleep(0.1)
-                        else:
-                            client.send_message(entity=channel_entity, message="Instagram")
-                            break
-                    else:
-                        break
-                client.send_message(entity=channel_entity, message=f"{user}")
-                print(f"{o}[{B}•{o}] Nom d'utilisateur : {v}{user}{S}")
-                mss = message()
-                if "Sorry" in mss:
-                    continue
-                elif "▪️ Action :" in mss:
-                    task(user)
-                    continue
-                elif "🟡 Account" in mss:
-                    print(f"{co}{mss}{S}")
-                    print(f"{J}[!] '🟡 Account' reçu. Aucune tâche pour {user} pour le moment.{S}")
-                    if user not in accounts_with_no_tasks:
-                        accounts_with_no_tasks.append(user)
-                        save_on_hold_accounts()
-                        print(f"{J}[-] {user} ajouté à la liste d'attente.{S}")
-                    time.sleep(2)
-                    continue
-                else:
-                    time.sleep(4)
-                    task(user)
-                    continue
-        else:
-            os.system("clear")
-            u = (f"{r}Aucun fichier trouvé : SmmKingdomTask/insta-acct.txt\n{S}")
-            for ix in u:
-                print(ix, end='', flush=True)
-                time.sleep(0.1)
-            menu()
+                
+        except Exception as e:
+            print(f"{R}Erreur critique dans la boucle principale: {e}{S}")
+            print(f"{J}Redémarrage de la boucle dans 10 secondes...{S}")
+            time.sleep(10)
+            continue
 
 def task(user):
     """
@@ -540,11 +579,11 @@ def task(user):
     global clien, var1, accounts_with_no_tasks
     client = clien[0]
     
-    # Initialisation et vérifications
-    if not _initialize_task_state(user):
-        return None
-    
     try:
+        # Initialisation et vérifications
+        if not _initialize_task_state(user):
+            return None
+        
         time.sleep(2)
         channel_entity = client.get_entity("@SmmKingdomTasksBot")
         mss = message()
@@ -560,8 +599,10 @@ def task(user):
             return _handle_other_messages(user, mss, client, channel_entity)
             
     except Exception as e:
-        print(f"{R}Erreur dans la tâche : {e}{S}")
-        task(user)
+        print(f"{R}Erreur dans la tâche pour {user}: {e}{S}")
+        print(f"{J}Continuation avec le prochain utilisateur...{S}")
+        # Ne pas appeler task(user) pour éviter la récursion
+        return None
 
 def _initialize_task_state(user):
     """
@@ -638,14 +679,26 @@ def _check_action_limits(user, action_type):
         if entry['user'] == user:
             if time.time() - entry['hold_time'] < 3600:
                 print(f"{J}{user} est en attente pour {action_type} (limite horaire).{S}")
+                # Ajouter l'utilisateur à la liste d'attente temporairement
+                if user not in accounts_with_no_tasks:
+                    accounts_with_no_tasks.append(user)
+                    save_on_hold_accounts()
                 return False
             else:
                 on_hold_action[action_type] = [e for e in on_hold_action[action_type] if e['user'] != user]
                 save_on_hold_action(on_hold_action)
+                # Retirer l'utilisateur de la liste d'attente
+                if user in accounts_with_no_tasks:
+                    accounts_with_no_tasks.remove(user)
+                    save_on_hold_accounts()
     
     # Vérification de la limite journalière
     if daily_state[user][action_type] >= DAILY_LIMITS[action_type]:
         print(f"{R}Limite journalière atteinte pour {user} ({action_type}). Mise en attente jusqu'à demain.{S}")
+        # Ajouter l'utilisateur à la liste d'attente
+        if user not in accounts_with_no_tasks:
+            accounts_with_no_tasks.append(user)
+            save_on_hold_accounts()
         return False
     
     # Vérification de la limite horaire
@@ -653,6 +706,10 @@ def _check_action_limits(user, action_type):
         print(f"{J}Limite horaire atteinte pour {user} ({action_type}). Mise en attente 1h.{S}")
         on_hold_action[action_type].append({'user': user, 'hold_time': time.time()})
         save_on_hold_action(on_hold_action)
+        # Ajouter l'utilisateur à la liste d'attente temporairement
+        if user not in accounts_with_no_tasks:
+            accounts_with_no_tasks.append(user)
+            save_on_hold_accounts()
         return False
     
     return True
@@ -689,12 +746,17 @@ def _execute_like_action(user, link, client, channel_entity):
         _update_action_counters(user, 'like')
         client.send_message(entity=channel_entity, message="✅Completed")
         human_delay()
-        task(user)
+        return None  # Retour au lieu de task(user) pour éviter la récursion
     except Exception as e:
         print(f"{vi}[{R}x{vi}] {R}Échec du Like: {e}{S}")
+        # Gestion spécifique des erreurs courantes
+        if "KeyError: 'data'" in str(e) or "no longer available" in str(e):
+            print(f"{R}Le post n'est plus disponible ou le lien est invalide.{S}")
+        elif "already liked" in str(e):
+            print(f"{J}Post déjà liké{S}")
         client.send_message(entity=channel_entity, message="✅Completed")
         human_delay()
-        task(user)
+        return None  # Retour au lieu de task(user) pour éviter la récursion
 
 def _execute_follow_action(user, link, client, channel_entity):
     """
@@ -705,19 +767,31 @@ def _execute_follow_action(user, link, client, channel_entity):
     
     try:
         cl = ig_connect(user)
+        # Amélioration de l'extraction du nom d'utilisateur
         username = link.rstrip('/').split('/')[-1]
+        if not username or username == "":
+            print(f"{R}Nom d'utilisateur invalide dans le lien: {link}{S}")
+            client.send_message(entity=channel_entity, message="✅Completed")
+            human_delay()
+            return None
+            
         user_id = cl.user_id_from_username(username)
         cl.user_follow(user_id)
         print(f"{vi}[{V}√{vi}] {V}Follow réussi{S}")
         _update_action_counters(user, 'follow')
         client.send_message(entity=channel_entity, message="✅Completed")
         human_delay()
-        task(user)
+        return None  # Retour au lieu de task(user) pour éviter la récursion
     except Exception as e:
         print(f"{vi}[{R}x{vi}] {R}Échec du Follow: {e}{S}")
+        # Gestion spécifique des erreurs courantes
+        if "User not found" in str(e) or "404" in str(e):
+            print(f"{J}Utilisateur non trouvé ou compte privé/supprimé{S}")
+        elif "already following" in str(e):
+            print(f"{J}Déjà en train de suivre cet utilisateur{S}")
         client.send_message(entity=channel_entity, message="✅Completed")
         human_delay()
-        task(user)
+        return None  # Retour au lieu de task(user) pour éviter la récursion
 
 def _execute_comment_action(user, link, client, channel_entity):
     """
@@ -739,14 +813,19 @@ def _execute_comment_action(user, link, client, channel_entity):
         _update_action_counters(user, 'comment')
         client.send_message(entity=channel_entity, message="✅Completed")
         human_delay()
-        task(user)
+        return None  # Retour au lieu de task(user) pour éviter la récursion
     except Exception as e:
         print(f"{vi}[{R}x{vi}] {R}Échec du commentaire: {e}{S}")
+        # Gestion spécifique des erreurs courantes
         if "KeyError: 'data'" in str(e) or "no longer available" in str(e):
             print(f"{R}Le post n'est plus disponible ou le lien est invalide.{S}")
+        elif "commenting is disabled" in str(e):
+            print(f"{J}Les commentaires sont désactivés sur ce post{S}")
+        elif "spam" in str(e).lower():
+            print(f"{J}Commentaire détecté comme spam{S}")
         client.send_message(entity=channel_entity, message="✅Completed")
         human_delay()
-        task(user)
+        return None  # Retour au lieu de task(user) pour éviter la récursion
 
 def _execute_story_action(user, link, client, channel_entity):
     """
@@ -764,12 +843,17 @@ def _execute_story_action(user, link, client, channel_entity):
         _update_action_counters(user, 'story')  # Utilise le compteur story
         client.send_message(entity=channel_entity, message="✅Completed")
         human_delay()
-        task(user)
+        return None  # Retour au lieu de task(user) pour éviter la récursion
     except Exception as e:
         print(f"{vi}[{R}x{vi}] {R}Échec du Story like: {e}{S}")
+        # Gestion spécifique des erreurs courantes
+        if "KeyError: 'data'" in str(e) or "no longer available" in str(e):
+            print(f"{R}Le story n'est plus disponible ou le lien est invalide.{S}")
+        elif "already liked" in str(e):
+            print(f"{J}Story déjà liké{S}")
         client.send_message(entity=channel_entity, message="✅Completed")
         human_delay()
-        task(user)
+        return None  # Retour au lieu de task(user) pour éviter la récursion
 
 def _update_action_counters(user, action_type):
     """
@@ -828,10 +912,10 @@ def _handle_completed_message(user, client, channel_entity):
                 time.sleep(0.1)
             else:
                 client.send_message(entity=channel_entity, message="✅Completed")
-                task(user)
+                return None  # Retour au lieu de task(user)
         else:
             break
-    task(user)
+    return None  # Retour au lieu de task(user)
 
 def _handle_user_message(user, client, channel_entity):
     """
@@ -847,31 +931,34 @@ def _handle_user_message(user, client, channel_entity):
                 time.sleep(0.1)
             else:
                 client.send_message(entity=channel_entity, message=f"{user}")
-                task(user)
+                return None  # Retour au lieu de task(user)
         else:
             break
-    task(user)
+    return None  # Retour au lieu de task(user)
 
 def _handle_comment_message(user, mss, client, channel_entity):
     """
     Gère les messages de commentaire.
     """
-    cmt = coms1()
-    link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(cmt)).group(1)
-    print(f"{vi}Lien du commentaire : {B}{link}")
-    print(f"{J}{mss}")
-    
     try:
+        cmt = coms1()
+        link = re.search('▪️ Link :\n(.*?)\n▪️ Action :', str(cmt)).group(1)
+        print(f"{vi}Lien du commentaire : {B}{link}")
+        print(f"{J}{mss}")
+        
         cl = ig_connect(user)
         media_id = cl.media_pk_from_url(link)
         cl.media_comment(media_id, mss)
         print(f"{vi}[{V}√{vi}] {V}Commentaire réussi{S}")
         client.send_message(entity=channel_entity, message="✅Completed")
-        task(user)
+        return None  # Retour au lieu de task(user)
     except Exception as e:
         print(f"{vi}[{R}x{vi}] {R}Échec du commentaire: {e}{S}")
+        # Gestion spécifique des erreurs courantes
+        if "KeyError: 'data'" in str(e) or "no longer available" in str(e):
+            print(f"{R}Le post n'est plus disponible ou le lien est invalide.{S}")
         client.send_message(entity=channel_entity, message="✅Completed")
-        task(user)
+        return None  # Retour au lieu de task(user)
 
 def reactivate_accounts():
     on_hold_action = load_on_hold_action()
